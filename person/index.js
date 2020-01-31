@@ -6,11 +6,11 @@ const MONGO_DB_NAME = process.env['MONGO_DB_NAME'];
 const bcrypt = require('bcrypt');
 const saltRounds = 8;
 
-const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const STORAGE_ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+const AZURE_STORAGE_CONNECTION_STRING = process.env['AUTH_AZURE_STORAGE_CONNECTION_STRING'];
+const STORAGE_ACCOUNT_NAME = process.env['AZURE_STORAGE_ACCOUNT_NAME'];
 const ONE_MINUTE = 60 * 1000;
 
-module.exports = async function (context, req) {
+module.exports = function (context, req) {
     switch (req.method) {
         case "GET":
             GET_person();
@@ -34,7 +34,7 @@ module.exports = async function (context, req) {
         context.done();
     }
 
-    function GET_person() {
+    async function GET_person() {
         var requestedID;
         if (req.query) {
             requestedID = req.query["id"];
@@ -65,7 +65,7 @@ module.exports = async function (context, req) {
             context.res(error);
             context.done();
         }
-        function getPerson(id) {
+        async function getPerson(id) {
             await createMongoClient();
             return new Promise(function (resolve, reject) {
                 try {
@@ -110,7 +110,7 @@ module.exports = async function (context, req) {
                 }
             });
         }
-        function getPeople() {
+        async function getPeople() {
             await createMongoClient();
             return new Promise(function (resolve, reject) {
                 try {
@@ -169,11 +169,13 @@ module.exports = async function (context, req) {
                 personAvatarUrl = await writeBlob(personAvatar);
             }
 
+            let passwordHash = await generatePasswordHash(userData.password);
+
             let userToWrite = {
                 username: userData.username,
                 email: userData.email,
-                password: generatePasswordHash(userData.password),
-                is_actiuve: true
+                password: passwordHash,
+                is_active: true
             };
 
             let user = await writeUser(userToWrite);
@@ -190,6 +192,7 @@ module.exports = async function (context, req) {
             };
 
             let response = await writePerson(person);
+
             context.res={
                 status:201,
                 body:response,
@@ -197,6 +200,7 @@ module.exports = async function (context, req) {
                     'Content-Type':'application/json'
                 }
             }
+            context.done();
 
         }
         catch (error) {
@@ -321,7 +325,7 @@ module.exports = async function (context, req) {
                 };
                 context.done();
             }
-            if (!user) {
+            if (!userData) {
                 context.res = {
                     status: 400,
                     body: {
@@ -333,7 +337,7 @@ module.exports = async function (context, req) {
                 };
                 context.done();
             }
-            if (!user.username || !user.email || !user.password) {
+            if (!userData.username || !userData.email || !userData.password) {
                 context.res = {
                     status: 400,
                     body: 'Required user fields: "username", "password", "email"',
@@ -353,7 +357,7 @@ module.exports = async function (context, req) {
             global.Blob = require('node-blob');
             const b64toBlob = require('b64-to-blob');
             const { AbortController } = require('@azure/abort-controller');
-            const containerName = 'driver-id';
+            const containerName = 'person-avatar';
 
             var base64Data = base64String.split(';base64,').pop();
             var contentType = base64String.split(';base64,').shift().replace('data:', '');
@@ -374,7 +378,7 @@ module.exports = async function (context, req) {
                 return storageUrl + '/' + containerName + '/' + blobName;
             }
             catch (e) {
-                throw new Error(500);
+                throw new Error(e);
             }
         }
         async function writePerson(person) {
@@ -395,7 +399,7 @@ module.exports = async function (context, req) {
                                 });
                                 return;
                             }
-                            resolve(docs);
+                            resolve(docs.ops[0]);
                         });
                 }
                 catch (error) {
@@ -427,7 +431,7 @@ module.exports = async function (context, req) {
                                 });
                                 return;
                             }
-                            resolve(docs);
+                            resolve(docs.ops[0]);
                         });
                 }
                 catch (error) {
@@ -442,7 +446,17 @@ module.exports = async function (context, req) {
             });
         }
         function generatePasswordHash(password) {
-            return bcrypt.hash(password, saltRounds);
+            return new Promise(function(resolve,reject){
+                bcrypt.hash(password, saltRounds,function(err, hash) {
+                    if(err){
+                        reject(err);
+                    }
+                    if(hash){
+                        resolve(hash);
+                    }
+                  });
+            });
+            
         }
     }
     //Internal globals
