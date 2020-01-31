@@ -4,8 +4,7 @@ let mongo_client = null;
 const connection_mongoDB = process.env["connection_mongoDB"];
 const MONGO_DB_NAME = process.env['MONGO_DB_NAME'];
 
-const bcrypt = require('bcrypt');
-const saltRounds = 8;
+const crypto = require('crypto');
 
 const AZURE_STORAGE_CONNECTION_STRING = process.env['AUTH_AZURE_STORAGE_CONNECTION_STRING'];
 const STORAGE_ACCOUNT_NAME = process.env['AZURE_STORAGE_ACCOUNT_NAME'];
@@ -63,7 +62,7 @@ module.exports = function (context, req) {
             }
         }
         catch (error) {
-            context.res=error;
+            context.res = error;
             context.done();
         }
         async function getPerson(id) {
@@ -181,7 +180,7 @@ module.exports = function (context, req) {
                 personAvatarUrl = await writeBlob(personAvatar);
             }
 
-            let passwordHash = await generatePasswordHash(userData.password);
+            let passwordHash = generatePasswordHash(userData.password);
 
             let userToWrite = {
                 username: userData.username,
@@ -191,7 +190,6 @@ module.exports = function (context, req) {
             };
 
             let user = await writeUser(userToWrite);
-
             person = {
                 nombre: personName,
                 apellido_paterno: personMiddleName,
@@ -202,6 +200,8 @@ module.exports = function (context, req) {
                 permissions: userPermissions,
                 user: user
             };
+
+            delete person.user.password;
 
             let response = await writePerson(person);
 
@@ -219,7 +219,7 @@ module.exports = function (context, req) {
             context.res = error;
             context.done();
         }
-
+        6
         //Internal functions        
         async function searchAgency(agencyId) {
             await createMongoClient();
@@ -463,17 +463,54 @@ module.exports = function (context, req) {
                 }
             });
         }
-        function generatePasswordHash(password) {
-            return new Promise(function (resolve, reject) {
-                bcrypt.hash(password, saltRounds, function (err, hash) {
-                    if (err) {
-                        reject(err);
-                    }
-                    if (hash) {
-                        resolve(hash);
-                    }
-                });
-            });
+        function generatePasswordHash(userpassword) {
+            // return new Promise(function (resolve, reject) {
+            //     bcrypt.hash(password, saltRounds, function (err, hash) {
+            //         if (err) {
+            //             reject(err);
+            //         }
+            //         if (hash) {
+            //             resolve(hash);
+            //         }
+            //     });
+            // });
+
+            // var salt = crypto.randomBytes(128).toString('base64');
+            // var iterations = 10000;
+            // var hash = crypto.pbkdf2(password, salt, iterations);
+
+            // return {
+            //     salt: salt,
+            //     hash: hash,
+            //     iterations: iterations
+            // };
+            var iterations = 16;/** Gives us salt of length 16 */
+            var salt = genRandomString(iterations); 
+            var passwordData = sha512(userpassword, salt);
+
+            return {
+                salt: salt,
+                hash: passwordData,
+                iterations: iterations
+            };
+
+            //Internal function
+
+            function genRandomString(length) {
+                return crypto.randomBytes(Math.ceil(length / 2))
+                    .toString('hex') /** convert to hexadecimal format */
+                    .slice(0, length);   /** return required number of characters */
+            };
+
+            function sha512(password, salt) {
+                var hash = crypto.createHmac('sha512', salt); /** Hashing algorithm sha512 */
+                hash.update(password);
+                var value = hash.digest('hex');
+                return {
+                    salt: salt,
+                    passwordHash: value
+                };
+            };
 
         }
     }
