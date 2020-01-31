@@ -1,5 +1,6 @@
 const mongodb = require('mongodb');
 let mongo_client = null;
+
 const connection_mongoDB = process.env["connection_mongoDB"];
 const MONGO_DB_NAME = process.env['MONGO_DB_NAME'];
 
@@ -62,7 +63,7 @@ module.exports = function (context, req) {
             }
         }
         catch (error) {
-            context.res(error);
+            context.res=error;
             context.done();
         }
         async function getPerson(id) {
@@ -128,8 +129,19 @@ module.exports = function (context, req) {
                                     }
                                 });
                             }
+                            if (docs) {
+                                resolve(docs);
+                            }
+                            else {
+                                reject({
+                                    status: 404,
+                                    body: {},
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    }
+                                });
+                            }
                         });
-                    resolve(docs);
                 }
                 catch (error) {
                     reject({
@@ -193,11 +205,11 @@ module.exports = function (context, req) {
 
             let response = await writePerson(person);
 
-            context.res={
-                status:201,
-                body:response,
-                headers:{
-                    'Content-Type':'application/json'
+            context.res = {
+                status: 201,
+                body: response,
+                headers: {
+                    'Content-Type': 'application/json'
                 }
             }
             context.done();
@@ -378,7 +390,13 @@ module.exports = function (context, req) {
                 return storageUrl + '/' + containerName + '/' + blobName;
             }
             catch (e) {
-                throw new Error(e);
+                throw new Error({
+                    status: 500,
+                    body: e.toString(),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
             }
         }
         async function writePerson(person) {
@@ -446,17 +464,17 @@ module.exports = function (context, req) {
             });
         }
         function generatePasswordHash(password) {
-            return new Promise(function(resolve,reject){
-                bcrypt.hash(password, saltRounds,function(err, hash) {
-                    if(err){
+            return new Promise(function (resolve, reject) {
+                bcrypt.hash(password, saltRounds, function (err, hash) {
+                    if (err) {
                         reject(err);
                     }
-                    if(hash){
+                    if (hash) {
                         resolve(hash);
                     }
-                  });
+                });
             });
-            
+
         }
     }
     //Internal globals
