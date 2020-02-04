@@ -7,7 +7,7 @@ const MONGO_DB_NAME = process.env['MONGO_DB_NAME'];
 const crypto = require('crypto');
 
 module.exports = function (context, req) {
-    
+
     switch (req.method) {
         case "POST":
             POST_login();
@@ -28,46 +28,47 @@ module.exports = function (context, req) {
         context.done();
     }
 
-    async function POST_login(){
-        let userName=req.body['username'];
-        let userPassword=req.body['password'];
+    async function POST_login() {
+        let userName = req.body['username'];
+        let userPassword = req.body['password'];
 
-        try{
+        try {
             let user = await searchUser();
-            if(validatePasswordHash(user.password.passwordData, userPassword)){
+            if (validatePasswordHash(user.password.passwordData, userPassword)) {
                 let fakeResponse = {
                     access_token: user['_id'],
                     expires_in: 86400,
                     token_type: "Bearer",
-                    refresh_token: user['_id']
+                    refresh_token: user['_id'],
+                    person: user['person_id'].toString()
                 };
-                context.res={
-                    status:200,
-                    body:fakeResponse,
-                    headers:{
-                        'Content-Type':'application/json'
+                context.res = {
+                    status: 200,
+                    body: fakeResponse,
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
                 }
                 context.done();
             }
-            else{                
-                context.res={
-                    status:401,
-                    body:'Invalid password',
-                    headers:{
-                        'Content-Type':'application/json'
+            else {
+                context.res = {
+                    status: 401,
+                    body: 'Invalid password',
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
                 }
                 context.done();
             }
         }
-        catch(error){
+        catch (error) {
             context.res = error;
             context.done();
         }
 
         //Internal functions
-        async function searchUser(){
+        async function searchUser() {
             await createMongoClient();
             return new Promise(function (resolve, reject) {
                 try {
@@ -116,10 +117,10 @@ module.exports = function (context, req) {
             let salt = passwordObject['salt'];
             let calculatedPassword = sha512(passwordString, salt);
 
-            if(passwordObject.passwordHash===calculatedPassword.passwordHash){
+            if (passwordObject.passwordHash === calculatedPassword.passwordHash) {
                 return true;
             }
-            else{
+            else {
                 return false;
             }
 
@@ -137,7 +138,7 @@ module.exports = function (context, req) {
 
         }
     }
-    
+
     //Internal globals
     function createMongoClient() {
         return new Promise(function (resolve, reject) {
