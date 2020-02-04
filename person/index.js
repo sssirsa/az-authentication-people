@@ -192,12 +192,12 @@ module.exports = function (context, req) {
 
             let response = await writePerson(person);
 
-            let passwordHash = generatePasswordHash(userData.password);
+            let passwordObject = generatePasswordHash(userData.password);
 
             let userToWrite = {
                 username: userData.username,
                 email: userData.email,
-                password: passwordHash,
+                password: passwordObject,
                 person_id: response['_id'],
                 is_active: true
             };
@@ -222,7 +222,7 @@ module.exports = function (context, req) {
             context.res = error;
             context.done();
         }
-        6
+        
         //Internal functions        
         async function searchAgency(agencyId) {
             await createMongoClient();
@@ -467,34 +467,12 @@ module.exports = function (context, req) {
             });
         }
         function generatePasswordHash(userpassword) {
-            // return new Promise(function (resolve, reject) {
-            //     bcrypt.hash(password, saltRounds, function (err, hash) {
-            //         if (err) {
-            //             reject(err);
-            //         }
-            //         if (hash) {
-            //             resolve(hash);
-            //         }
-            //     });
-            // });
-
-            // var salt = crypto.randomBytes(128).toString('base64');
-            // var iterations = 10000;
-            // var hash = crypto.pbkdf2(password, salt, iterations);
-
-            // return {
-            //     salt: salt,
-            //     hash: hash,
-            //     iterations: iterations
-            // };
             var iterations = 16;/** Gives us salt of length 16 */
             var salt = genRandomString(iterations); 
             var passwordData = sha512(userpassword, salt);
 
             return {
-                salt: salt,
-                hash: passwordData,
-                iterations: iterations
+                passwordData
             };
 
             //Internal function
