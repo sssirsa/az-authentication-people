@@ -35,8 +35,15 @@ module.exports = function (context, req) {
         try{
             let user = await searchUser();
             if(validatePasswordHash(user.password.passwordData, userPassword)){
+                let fakeResponse = {
+                    access_token: user['_id'],
+                    expires_in: 86400,
+                    token_type: "Bearer",
+                    refresh_token: user['_id']
+                };
                 context.res={
                     status:200,
+                    body:fakeResponse,
                     headers:{
                         'Content-Type':'application/json'
                     }
