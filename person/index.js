@@ -180,16 +180,6 @@ module.exports = function (context, req) {
                 personAvatarUrl = await writeBlob(personAvatar);
             }
 
-            let passwordHash = generatePasswordHash(userData.password);
-
-            let userToWrite = {
-                username: userData.username,
-                email: userData.email,
-                password: passwordHash,
-                is_active: true
-            };
-
-            let user = await writeUser(userToWrite);
             person = {
                 nombre: personName,
                 apellido_paterno: personMiddleName,
@@ -197,13 +187,26 @@ module.exports = function (context, req) {
                 sucursal: personSubsidiary,
                 udn: personAgency,
                 foto: personAvatarUrl,
-                permissions: userPermissions,
-                user: user
+                permissions: userPermissions
             };
 
-            delete person.user.password;
-
             let response = await writePerson(person);
+
+            let passwordHash = generatePasswordHash(userData.password);
+
+            let userToWrite = {
+                username: userData.username,
+                email: userData.email,
+                password: passwordHash,
+                person_id: response['_id'],
+                is_active: true
+            };
+
+            let user = await writeUser(userToWrite);
+
+            response['user']=user;
+
+            delete response.user.password;
 
             context.res = {
                 status: 201,
