@@ -171,10 +171,20 @@ module.exports = function (context, req) {
             let personAgency, personSubsidiary, personAvatarUrl;
 
             if (personAgencyId) {
-                personAgency = await searchAgency(personAgencyId);
+                if (personAgencyId.length === 24) {
+                    personAgency = await searchAgency(personAgencyId);
+                }
+                else {
+                    personAgency = {};
+                }
             }
             if (personSubsidiaryId) {
-                personSubsidiary = await searchSubsidiary(personSubsidiaryId);
+                if (personSubsidiaryId.length === 24) {
+                    personSubsidiary = await searchSubsidiary(personSubsidiaryId);
+                }
+                else {
+                    personSubsidiary = {};
+                }
             }
             if (personAvatar) {
                 personAvatarUrl = await writeBlob(personAvatar);
@@ -204,7 +214,7 @@ module.exports = function (context, req) {
 
             let user = await writeUser(userToWrite);
 
-            response['user']=user;
+            response['user'] = user;
 
             delete response.user.password;
 
@@ -219,10 +229,16 @@ module.exports = function (context, req) {
 
         }
         catch (error) {
-            context.res = error;
+            context.res = {
+                status: 500,
+                body: error.toString(),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
             context.done();
         }
-        
+
         //Internal functions        
         async function searchAgency(agencyId) {
             await createMongoClient();
@@ -468,7 +484,7 @@ module.exports = function (context, req) {
         }
         function generatePasswordHash(userpassword) {
             var iterations = 16;/** Gives us salt of length 16 */
-            var salt = genRandomString(iterations); 
+            var salt = genRandomString(iterations);
             var passwordData = sha512(userpassword, salt);
 
             return {
