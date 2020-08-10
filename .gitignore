@@ -93,3 +93,4 @@ obj
 appsettings.json
 local.settings.json
 local.settings.prod.json
+local.settings.dev.json

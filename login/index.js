@@ -36,11 +36,11 @@ module.exports = function (context, req) {
             let user = await searchUser();
             if (validatePasswordHash(user.password.passwordData, userPassword)) {
                 let fakeResponse = {
-                    access_token: user['_id'],
+                    access_token: user['person_id'].toString(),
                     expires_in: 86400,
                     token_type: "Bearer",
-                    refresh_token: user['_id'],
-                    person: user['person_id'].toString()
+                    refresh_token: user['_id'].toString(),
+                    person: await searchPerson(user['person_id'].toString())
                 };
                 context.res = {
                     status: 200,
@@ -101,7 +101,49 @@ module.exports = function (context, req) {
                         );
                 }
                 catch (error) {
-                    context.log(error);
+                    reject({
+                        status: 500,
+                        body: error.toString(),
+                        headers: {
+                            "Content-Type": "application/json"
+                        }
+                    })
+                }
+            });
+        }
+        async function searchPerson(personId) {
+            await createMongoClient();
+            return new Promise(function (resolve, reject) {
+                try {
+                    mongo_client
+                        .db(MONGO_DB_NAME)
+                        .collection('profiles')
+                        .findOne({ _id: mongodb.ObjectID(personId) },
+                            function (error, docs) {
+                                if (error) {
+                                    reject({
+                                        status: 500,
+                                        body: error.toString(),
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        }
+                                    });
+                                    return;
+                                }
+                                if (!docs) {
+                                    reject({
+                                        status: 401,
+                                        body: 'Not found person',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        }
+                                    });
+                                }
+                                resolve(docs);
+                            }
+                        );
+                }
+                catch (error) {
                     reject({
                         status: 500,
                         body: error.toString(),
