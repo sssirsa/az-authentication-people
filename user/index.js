@@ -6,6 +6,7 @@ const connection_mongoDB =
 const MONGO_DB_NAME = "management";
 
 const bcrypt = require("bcryptjs");
+const validator = require("validator");
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -79,6 +80,7 @@ module.exports = function (context, req) {
     // Internal Functions
 
     async function validate() {
+      // TO DO valid format email
       if (!userData) {
         context.res = {
           status: 400,
@@ -91,6 +93,22 @@ module.exports = function (context, req) {
         context.res = {
           status: 400,
           body: 'Required user fields: "username", "password", "email"',
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      if (!validator.isEmail(userData.email)) {
+        context.res = {
+          status: 400,
+          body: "Email is not a mail format",
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      if (userData.password.length < 6) {
+        context.res = {
+          status: 400,
+          body: "The min legth for password is  6",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
