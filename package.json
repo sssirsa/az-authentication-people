@@ -11,6 +11,8 @@
     "atob": "^2.1.2",
     "b64-to-blob": "^1.2.19",
     "based-blob": "^1.0.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^8.5.1",
     "mongodb": "3.x",
     "node-blob": "0.0.2"
   },
