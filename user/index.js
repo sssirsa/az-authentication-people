@@ -5,9 +5,11 @@ const connection_mongoDB =
   "mongodb+srv://devops:59LzYD00s3q9JK2s@cluster0-qrhyj.mongodb.net?retryWrites=true&w=majority";
 const MONGO_DB_NAME = "management";
 
+// middlewares
 const bcrypt = require("bcryptjs");
 const validator = require("validator");
 
+// constants environment
 const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
@@ -41,6 +43,7 @@ module.exports = function (context, req) {
 
   async function POST_user() {
     let person;
+    // get variables from body
     let personSubsidiaries = req.body["sucursal"];
     let personName = req.body["nombre"];
     let personMiddleName = req.body["apellido_paterno"];
@@ -55,6 +58,7 @@ module.exports = function (context, req) {
       let subsidiaries = [];
       let personAvatarUrl;
 
+      // get subsidiaries if user has
       if (personSubsidiaries) {
         for (let id of personSubsidiaries) {
           if (id.length === 24) {
@@ -80,7 +84,6 @@ module.exports = function (context, req) {
       }
 
       let passwordObject = generatePasswordHash(userData.password);
-
       const dateCreate = new Date();
 
       let userToWrite = {
@@ -157,7 +160,6 @@ module.exports = function (context, req) {
     }
 
     async function validate() {
-      // TO DO valid format email
       if (personSubsidiaryId.length === 0) {
         //User can not be in a subsidiary and an agency
         context.res = {
