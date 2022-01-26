@@ -39,7 +39,121 @@ module.exports = function (context, req) {
     context.done();
   }
 
-  async function GET_user() {}
+  async function GET_user() {
+    let requestedID;
+    if (req.query) {
+      requestedID = req.query["id"];
+    }
+
+    try {
+      if (requestedID) {
+        let person = await getPerson(requestedID);
+        context.res = {
+          body: person,
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      } else {
+        let people = await getPeople();
+        context.res = {
+          body: people,
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+    } catch (error) {
+      context.res = error;
+      context.done();
+    }
+
+    // Internal functions
+
+    async function getPerson(id) {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("usuarios")
+            .aggregate([
+              { $match: { _id: mongodb.ObjectID(id) } },
+              { $project: { password: 0 } },
+            ])
+            .toArray(function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error,
+                  headers: { "Content-Type": "application/json" },
+                });
+              }
+              if (docs) {
+                resolve(docs);
+              } else {
+                reject({
+                  status: 404,
+                  body: {},
+                  headers: { "Content-Type": "application/json" },
+                });
+              }
+            });
+        } catch (error) {
+          context.log(error);
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      });
+    }
+
+    async function getPeople() {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("usuarios")
+            .aggregate([
+              {
+                $project: { password: 0 },
+              },
+            ])
+            .toArray(function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                });
+              }
+              if (docs) {
+                resolve(docs);
+              } else {
+                reject({
+                  status: 404,
+                  body: {},
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                });
+              }
+            });
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      });
+    }
+  }
 
   async function POST_user() {
     let person;
