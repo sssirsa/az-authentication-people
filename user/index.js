@@ -453,9 +453,7 @@ module.exports = function (context, req) {
           reject({
             status: 500,
             body: error.toString(),
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
           });
         }
       });
@@ -470,7 +468,7 @@ module.exports = function (context, req) {
     validate();
     try {
       if (req.query["id"]) {
-        let query = { _id: mongodb.ObjectID(req.params["id"]) };
+        let query = { _id: mongodb.ObjectID(req.query["id"]) };
 
         const date = new Date();
 
@@ -588,10 +586,30 @@ module.exports = function (context, req) {
 
     async function updateUser(options, query) {
       await createMongoClient();
-      return db_client
-        .db(MONGO_DB_NAME)
-        .collection("usuarios")
-        .updateOne(query, { $set: options });
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("usuarios")
+            .updateOne(query, { $set: options }, function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: { "Content-Type": "application/json" },
+                });
+                return;
+              }
+              resolve(docs);
+            });
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      });
     }
   }
 
@@ -600,6 +618,10 @@ module.exports = function (context, req) {
       if (mongo_client) resolve();
       mongodb.MongoClient.connect(
         connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
         function (error, _mongo_client) {
           if (error) reject(error);
           mongo_client = _mongo_client;
