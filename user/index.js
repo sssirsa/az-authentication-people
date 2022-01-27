@@ -44,7 +44,6 @@ module.exports = function (context, req) {
     if (req.query) {
       requestedID = req.query["id"];
     }
-
     try {
       if (requestedID) {
         let person = await getPerson(requestedID);
@@ -467,7 +466,138 @@ module.exports = function (context, req) {
     }
   }
 
-  async function PUT_user() {}
+  async function PUT_user() {
+    // get variables from body
+    let password = req.body["password"];
+    let username = req.body["username"];
+    let email = req.body["email"];
+    validate();
+    try {
+      if (req.query["id"]) {
+        let query = { _id: mongodb.ObjectID(req.params["id"]) };
+
+        const date = new Date();
+
+        let userToWrite = {
+          last_modify: date,
+        };
+        if (password) {
+          userToWrite["password"] = generatePasswordHash(password);
+        }
+        if (email) {
+          userToWrite["email"] = email;
+        }
+        if (username) {
+          userToWrite["username"] = username;
+        }
+        let createResponse = await updateUser(userToWrite, query);
+        if (!createResponse.ops) {
+          context.res = {
+            status: 200,
+            body: createResponse,
+            headers: { "Content-Type": "application/json" },
+          };
+        } else {
+          context.res = {
+            status: 200,
+            body: createResponse.ops[0],
+            headers: { "Content-Type": "application/json" },
+          };
+        }
+      } else {
+        throw (context.res = {
+          status: 404,
+          body: "No results found with the given parameters",
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      context.done();
+    } catch (error) {
+      if (error.status) {
+        context.res = error;
+      } else {
+        context.res = {
+          status: 500,
+          body: error.toString(),
+          headers: { "Content-Type": "application/json" },
+        };
+      }
+      context.done();
+    }
+
+    // internal functions
+    async function validate() {
+      if (email && !validator.isEmail(email)) {
+        context.res = {
+          status: 400,
+          body: "Email is not a mail format",
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      if (password && password.length < 6) {
+        context.res = {
+          status: 400,
+          body: "The min legth for password is  6",
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      if (email) {
+        const userMail = await searchUser(email);
+        if (userMail) {
+          context.res = {
+            status: 400,
+            body: "The email already exists in other user",
+            headers: { "Content-Type": "application/json" },
+          };
+          context.done();
+        }
+      }
+    }
+
+    function generatePasswordHash(userpassword) {
+      const salt = bcrypt.genSaltSync();
+      return bcrypt.hashSync(userpassword, salt);
+    }
+
+    function searchUser(email) {
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("users")
+            .findOne({ email }, function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: { "Content-Type": "application/json" },
+                });
+                return;
+              }
+              resolve(docs);
+            });
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      });
+    }
+
+    async function updateUser(options, query) {
+      await createMongoClient();
+      return db_client
+        .db(MONGO_DB_NAME)
+        .collection("usuarios")
+        .updateOne(query, { $set: options });
+    }
+  }
 
   function createMongoClient() {
     return new Promise(function (resolve, reject) {
