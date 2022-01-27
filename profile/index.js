@@ -27,4 +27,31 @@ module.exports = function (context, req) {
       notAllowed();
       break;
   }
+
+  function notAllowed() {
+    context.res = {
+      status: 405,
+      body: "Method not allowed",
+      headers: { "Content-Type": "application/json" },
+    };
+    context.done();
+  }
+
+  function createMongoClient() {
+    return new Promise(function (resolve, reject) {
+      if (mongo_client) resolve();
+      mongodb.MongoClient.connect(
+        connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+        function (error, _mongo_client) {
+          if (error) reject(error);
+          mongo_client = _mongo_client;
+          resolve();
+        }
+      );
+    });
+  }
 };
