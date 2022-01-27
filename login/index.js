@@ -43,7 +43,6 @@ module.exports = function (context, req) {
           access_token: token,
           person,
         };
-        console.log(response);
         context.res = {
           status: 200,
           body: response,
@@ -189,6 +188,10 @@ module.exports = function (context, req) {
       if (!mongo_client) {
         mongodb.MongoClient.connect(
           connection_mongoDB,
+          {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+          },
           function (error, _mongo_client) {
             if (error) reject(error);
             mongo_client = _mongo_client;
