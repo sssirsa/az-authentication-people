@@ -269,7 +269,7 @@ module.exports = function (context, req) {
     }
 
     async function validate() {
-      if (personSubsidiaryId.length === 0) {
+      if (personSubsidiaries.length === 0) {
         //User can not be in a subsidiary and an agency
         context.res = {
           status: 400,
