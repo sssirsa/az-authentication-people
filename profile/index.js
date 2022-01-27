@@ -28,6 +28,119 @@ module.exports = function (context, req) {
       break;
   }
 
+  async function GET_profile() {
+    let requestedID;
+    if (req.query) requestedID = req.query["id"];
+    try {
+      if (requestedID) {
+        let person = await getPerson(requestedID);
+        context.res = {
+          body: person,
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      } else {
+        let people = await getPeople();
+        context.res = {
+          body: people,
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+    } catch (error) {
+      context.res = error;
+      context.done();
+    }
+
+    // Internal functions
+
+    async function getPerson(id) {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("profiles_test")
+            .aggregate([
+              { $match: { _id: mongodb.ObjectID(id) } },
+              { $project: { password: 0 } },
+            ])
+            .toArray(function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error,
+                  headers: { "Content-Type": "application/json" },
+                });
+              }
+              if (docs) {
+                resolve(docs);
+              } else {
+                reject({
+                  status: 404,
+                  body: {},
+                  headers: { "Content-Type": "application/json" },
+                });
+              }
+            });
+        } catch (error) {
+          context.log(error);
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      });
+    }
+
+    async function getPeople() {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("profiles_test")
+            .aggregate([
+              {
+                $project: { password: 0 },
+              },
+            ])
+            .toArray(function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                });
+              }
+              if (docs) {
+                resolve(docs);
+              } else {
+                reject({
+                  status: 404,
+                  body: {},
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                });
+              }
+            });
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      });
+    }
+  }
+
   function notAllowed() {
     context.res = {
       status: 405,

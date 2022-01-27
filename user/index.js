@@ -44,14 +44,14 @@ module.exports = function (context, req) {
     if (req.query) requestedID = req.query["id"];
     try {
       if (requestedID) {
-        let person = await getPerson(requestedID);
+        let person = await getUsers(requestedID);
         context.res = {
           body: person,
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       } else {
-        let people = await getPeople();
+        let people = await getUser();
         context.res = {
           body: people,
           headers: { "Content-Type": "application/json" },
@@ -65,7 +65,7 @@ module.exports = function (context, req) {
 
     // Internal functions
 
-    async function getPerson(id) {
+    async function getUsers(id) {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
@@ -105,7 +105,7 @@ module.exports = function (context, req) {
       });
     }
 
-    async function getPeople() {
+    async function getUser() {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
