@@ -41,9 +41,7 @@ module.exports = function (context, req) {
 
   async function GET_user() {
     let requestedID;
-    if (req.query) {
-      requestedID = req.query["id"];
-    }
+    if (req.query) requestedID = req.query["id"];
     try {
       if (requestedID) {
         let person = await getPerson(requestedID);
@@ -192,9 +190,7 @@ module.exports = function (context, req) {
 
       let response = await writePerson(person);
 
-      if (personAvatar) {
-        personAvatarUrl = await writeBlob(personAvatar);
-      }
+      if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
 
       let passwordObject = generatePasswordHash(userData.password);
       const dateCreate = new Date();
