@@ -1,9 +1,9 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
-const connection_mongoDB =
-  "mongodb+srv://devops:59LzYD00s3q9JK2s@cluster0-qrhyj.mongodb.net?retryWrites=true&w=majority";
-const MONGO_DB_NAME = "management";
+// database
+const connection_mongoDB = process.env["connection_mongoDB"];
+const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 
 // middlewares
 const bcrypt = require("bcryptjs");
@@ -43,6 +43,7 @@ module.exports = function (context, req) {
     let requestedID;
     if (req.query) requestedID = req.query["id"];
     try {
+      // search user by Id
       if (requestedID) {
         let person = await getUsers(requestedID);
         context.res = {
@@ -50,6 +51,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
         context.done();
+        // search all users
       } else {
         let people = await getUser();
         context.res = {
@@ -59,7 +61,11 @@ module.exports = function (context, req) {
         context.done();
       }
     } catch (error) {
-      context.res = error;
+      context.res = {
+        status: 500,
+        body: error.toString(),
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     }
 
@@ -71,7 +77,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .aggregate([
               { $match: { _id: mongodb.ObjectID(id) } },
               { $project: { password: 0 } },
@@ -89,7 +95,7 @@ module.exports = function (context, req) {
               } else {
                 reject({
                   status: 404,
-                  body: {},
+                  body: "AU-001",
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -111,7 +117,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .aggregate([
               {
                 $project: { password: 0 },
@@ -122,9 +128,7 @@ module.exports = function (context, req) {
                 reject({
                   status: 500,
                   body: error.toString(),
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
+                  headers: { "Content-Type": "application/json" },
                 });
               }
               if (docs) {
@@ -132,10 +136,8 @@ module.exports = function (context, req) {
               } else {
                 reject({
                   status: 404,
-                  body: {},
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
+                  body: "AU-002",
+                  headers: { "Content-Type": "application/json" },
                 });
               }
             });
@@ -143,9 +145,7 @@ module.exports = function (context, req) {
           reject({
             status: 500,
             body: error.toString(),
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
           });
         }
       });
@@ -250,7 +250,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: { message: "ES-043" },
+                    body: "AU-003",
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -269,31 +269,25 @@ module.exports = function (context, req) {
     }
 
     async function validate() {
-      if (personSubsidiaries.length === 0) {
-        //User can not be in a subsidiary and an agency
-        context.res = {
-          status: 400,
-          body: { message: "AU-001" },
-          headers: { "Content-Type": "application/json" },
-        };
-        context.done();
-      }
+      // check person names
       if (!personName || !personMiddleName) {
         context.res = {
           status: 400,
-          body: 'Required fields: "nombre", "apellido_paterno"',
+          body: "AU-004",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
+      // check object userData
       if (!userData) {
         context.res = {
           status: 400,
-          body: { message: "AU-002" },
+          body: { message: "AU-005" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
+      // check fields in userData
       if (!userData.username || !userData.email || !userData.password) {
         context.res = {
           status: 400,
@@ -302,27 +296,42 @@ module.exports = function (context, req) {
         };
         context.done();
       }
+      // check is email is valid
       if (!validator.isEmail(userData.email)) {
         context.res = {
           status: 400,
-          body: "Email is not a mail format",
+          body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
+      // check password length
       if (userData.password.length < 6) {
         context.res = {
           status: 400,
-          body: "The min legth for password is  6",
+          body: "AU-009",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
-      const user = await searchUser(userData.email);
+      // search user by email
+      let query = { email: userData.email };
+      const user = await searchUser(query);
       if (user) {
         context.res = {
           status: 400,
-          body: "The email already exists in other user",
+          body: "AU-009",
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      // search user by user_name
+      query = { username: userData.username };
+      const userbyName = await searchUser(query);
+      if (userbyName) {
+        context.res = {
+          status: 400,
+          body: "AU-010",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -432,13 +441,13 @@ module.exports = function (context, req) {
       return bcrypt.hashSync(userpassword, salt);
     }
 
-    function searchUser(email) {
+    function searchUser(query) {
       return new Promise(function (resolve, reject) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .findOne({ email }, function (error, docs) {
+            .findOne(query, function (error, docs) {
               if (error) {
                 reject({
                   status: 500,
@@ -501,7 +510,7 @@ module.exports = function (context, req) {
       } else {
         throw (context.res = {
           status: 404,
-          body: "No results found with the given parameters",
+          body: "AU-001",
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -524,7 +533,7 @@ module.exports = function (context, req) {
       if (email && !validator.isEmail(email)) {
         context.res = {
           status: 400,
-          body: "Email is not a mail format",
+          body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -532,17 +541,32 @@ module.exports = function (context, req) {
       if (password && password.length < 6) {
         context.res = {
           status: 400,
-          body: "The min legth for password is  6",
+          body: "AU-009",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
+      // search user by email
       if (email) {
-        const userMail = await searchUser(email);
-        if (userMail) {
+        let query = { email };
+        const user = await searchUser(query);
+        if (user) {
           context.res = {
             status: 400,
-            body: "The email already exists in other user",
+            body: "AU-009",
+            headers: { "Content-Type": "application/json" },
+          };
+          context.done();
+        }
+      }
+      // search user by user_name
+      if (username) {
+        let query = { username };
+        const user = await searchUser(query);
+        if (user) {
+          context.res = {
+            status: 400,
+            body: "AU-010",
             headers: { "Content-Type": "application/json" },
           };
           context.done();
@@ -555,13 +579,13 @@ module.exports = function (context, req) {
       return bcrypt.hashSync(userpassword, salt);
     }
 
-    function searchUser(email) {
+    function searchUser(query) {
       return new Promise(function (resolve, reject) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .findOne({ email }, function (error, docs) {
+            .findOne(query, function (error, docs) {
               if (error) {
                 reject({
                   status: 500,
@@ -576,9 +600,7 @@ module.exports = function (context, req) {
           reject({
             status: 500,
             body: error.toString(),
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
           });
         }
       });
@@ -590,7 +612,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .updateOne(query, { $set: options }, function (error, docs) {
               if (error) {
                 reject({
