@@ -72,14 +72,13 @@ module.exports = function (context, req) {
                 });
               }
               if (docs.length === 0) {
-                resolve(docs);
-              } else {
                 reject({
                   status: 404,
                   body: "AU-011",
                   headers: { "Content-Type": "application/json" },
                 });
               }
+              resolve(docs);
             });
         } catch (error) {
           context.log(error);
