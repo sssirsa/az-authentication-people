@@ -473,7 +473,6 @@ module.exports = function (context, req) {
     try {
       if (error) {
         context.res = error;
-        console.log(error);
       } else {
         if (req.query["id"]) {
           let query = { _id: mongodb.ObjectID(req.query["id"]) };
@@ -493,7 +492,6 @@ module.exports = function (context, req) {
             userToWrite["username"] = username;
           }
           let updateResponse = await updateUser(userToWrite, query);
-          console.log(updateResponse);
           if (!updateResponse.ops) {
             context.res = {
               status: 200,

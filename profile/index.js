@@ -71,12 +71,12 @@ module.exports = function (context, req) {
                   headers: { "Content-Type": "application/json" },
                 });
               }
-              if (docs) {
+              if (docs.length === 0) {
                 resolve(docs);
               } else {
                 reject({
                   status: 404,
-                  body: 'AU-011',
+                  body: "AU-011",
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -114,15 +114,14 @@ module.exports = function (context, req) {
                   },
                 });
               }
-              if (docs) {
-                resolve(docs);
-              } else {
+              if (docs.length === 0) {
                 reject({
                   status: 404,
-                  body: 'AU-012',
+                  body: "AU-012",
                   headers: { "Content-Type": "application/json" },
                 });
               }
+              resolve(docs);
             });
         } catch (error) {
           reject({
@@ -145,38 +144,41 @@ module.exports = function (context, req) {
     let personAvatar = req.body["foto"];
     let userPermissions = req.body["permissions"];
 
-    validate();
-
     try {
-      let subsidiaries = [];
-      let personAvatarUrl;
-      // get subsidiaries if user has
-      if (personSubsidiaries) {
-        for (let id of personSubsidiaries) {
-          if (id.length === 24) {
-            const subs = await searchSubsidiary(id);
-            subsidiaries.push(subs);
+      const error = await validate();
+      if (error) {
+        context.res = error;
+      } else {
+        let subsidiaries = [];
+        let personAvatarUrl;
+        // get subsidiaries if user has
+        if (personSubsidiaries) {
+          for (let id of personSubsidiaries) {
+            if (id.length === 24) {
+              const subs = await searchSubsidiary(id);
+              subsidiaries.push(subs);
+            }
           }
         }
+        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+
+        person = {
+          nombre: personName,
+          apellido_paterno: personMiddleName,
+          apellido_materno: personLastName,
+          sucursal: subsidiaries,
+          foto: personAvatarUrl,
+          permissions: userPermissions,
+        };
+
+        let response = await writePerson(person);
+
+        context.res = {
+          status: 201,
+          body: response,
+          headers: { "Content-Type": "application/json" },
+        };
       }
-      if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
-
-      person = {
-        nombre: personName,
-        apellido_paterno: personMiddleName,
-        apellido_materno: personLastName,
-        sucursal: subsidiaries,
-        foto: personAvatarUrl,
-        permissions: userPermissions,
-      };
-
-      let response = await writePerson(person);
-
-      context.res = {
-        status: 201,
-        body: response,
-        headers: { "Content-Type": "application/json" },
-      };
       context.done();
     } catch (error) {
       context.res = {
@@ -193,7 +195,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("subsidiaries")
+            .collection("subsidiary")
             .findOne(
               { _id: mongodb.ObjectId(subsidiaryId) },
               function (error, docs) {
@@ -208,7 +210,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: { message: "ES-043" },
+                    body: "003",
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -228,13 +230,13 @@ module.exports = function (context, req) {
 
     async function validate() {
       if (!personName || !personMiddleName) {
-        context.res = {
+        return {
           status: 400,
-          body: 'AU-004',
+          body: "AU-004",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
+      return;
     }
 
     async function writeBlob(base64String) {
@@ -316,46 +318,51 @@ module.exports = function (context, req) {
     let personLastName = req.body["apellido_materno"];
     let personAvatar = req.body["foto"];
     let userPermissions = req.body["permissions"];
+    const error = await validate();
     try {
-      if (req.query["id"]) {
-        let subsidiaries = [];
-        let personAvatarUrl;
-        let query = { _id: mongodb.ObjectID(req.query["id"]) };
+      if (error) {
+        context.res = error;
+      } else {
+        if (req.query["id"]) {
+          let subsidiaries = [];
+          let personAvatarUrl;
+          let query = { _id: mongodb.ObjectID(req.query["id"]) };
 
-        if (personSubsidiaries) {
-          for (let id of personSubsidiaries) {
-            if (id.length === 24) {
-              const subs = await searchSubsidiary(id);
-              subsidiaries.push(subs);
+          if (personSubsidiaries) {
+            for (let id of personSubsidiaries) {
+              if (id.length === 24) {
+                const subs = await searchSubsidiary(id);
+                subsidiaries.push(subs);
+              }
             }
           }
-        }
 
-        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+          if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
 
-        if (personName) person["nombre"] = personName;
-        if (personMiddleName) person["apellido_paterno"] = personMiddleName;
-        if (personLastName) person["apellido_materno"] = personLastName;
-        if (userPermissions) person["permissions"] = userPermissions;
-        if (subsidiaries.length > 0) person["sucursal"] = subsidiaries;
-        if (personAvatarUrl) person["foto"] = personAvatarUrl;
+          if (personName) person["nombre"] = personName;
+          if (personMiddleName) person["apellido_paterno"] = personMiddleName;
+          if (personLastName) person["apellido_materno"] = personLastName;
+          if (userPermissions) person["permissions"] = userPermissions;
+          if (subsidiaries.length > 0) person["sucursal"] = subsidiaries;
+          if (personAvatarUrl) person["foto"] = personAvatarUrl;
 
-        let response = await writePerson(person, query);
+          let response = await writePerson(person, query);
 
-        if (!response.ops) {
+          if (!response.ops) {
+            context.res = {
+              status: 200,
+              body: response,
+              headers: { "Content-Type": "application/json" },
+            };
+          }
+          context.done();
+        } else {
           context.res = {
-            status: 200,
-            body: response,
+            status: 500,
+            body: error.toString(),
             headers: { "Content-Type": "application/json" },
           };
         }
-        context.done();
-      } else {
-        context.res = {
-          status: 500,
-          body: error.toString(),
-          headers: { "Content-Type": "application/json" },
-        };
       }
       context.done();
     } catch (error) {
@@ -378,7 +385,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("subsidiaries")
+            .collection("subsidiary")
             .findOne(
               { _id: mongodb.ObjectId(subsidiaryId) },
               function (error, docs) {
@@ -393,7 +400,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: { message: "ES-043" },
+                    body: { message: "AU-003" },
                     headers: { "Content-Type": "application/json" },
                   });
                 }
