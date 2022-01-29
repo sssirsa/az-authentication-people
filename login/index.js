@@ -1,14 +1,14 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
-const connection_mongoDB =
-  "mongodb+srv://devops:59LzYD00s3q9JK2s@cluster0-qrhyj.mongodb.net?retryWrites=true&w=majority";
-const MONGO_DB_NAME = "management";
+// database
+const connection_mongoDB = process.env["connection_mongoDB"];
+const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const SECRET_JWT_SEED = "e201994dca9320fc94336603b1cfc970";
+const SECRET_JWT_SEED = process.env['SECRET_JWT_SEED'];
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -34,7 +34,6 @@ module.exports = function (context, req) {
     let userPassword = req.body["password"];
     try {
       validate();
-      console.log("validate pass");
       let user = await searchUser();
       if (bcrypt.compareSync(userPassword, user.password)) {
         const token = await generarJWT(user._id, userName);
@@ -46,18 +45,14 @@ module.exports = function (context, req) {
         context.res = {
           status: 200,
           body: response,
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
         };
         context.done();
       } else {
         context.res = {
           status: 401,
-          body: "Invalid password",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          body: "AU-015",
+          headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
@@ -71,7 +66,7 @@ module.exports = function (context, req) {
       if (!userName) {
         context.res = {
           status: 400,
-          body: { message: "No se ha recibido el usuario" },
+          body: { message: "AU-013" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -79,7 +74,7 @@ module.exports = function (context, req) {
       if (!userPassword) {
         context.res = {
           status: 400,
-          body: { message: "No se ha recibido la contraseña" },
+          body: { message: "AU-014" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -92,7 +87,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .findOne({ username: userName }, function (error, docs) {
               if (error) {
                 reject({
@@ -105,7 +100,7 @@ module.exports = function (context, req) {
               if (!docs) {
                 reject({
                   status: 401,
-                  body: "Invalid username",
+                  body: "AU-001",
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -127,7 +122,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .findOne(
               { _id: mongodb.ObjectID(personId) },
               function (error, docs) {
@@ -142,7 +137,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 401,
-                    body: "Not found person",
+                    body: "AU-011",
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -170,8 +165,6 @@ module.exports = function (context, req) {
           },
           (error, token) => {
             if (error) {
-              // todo mal
-              console.log(error);
               reject(error);
             } else {
               resolve(token);
