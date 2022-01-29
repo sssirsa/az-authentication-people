@@ -273,7 +273,7 @@ module.exports = function (context, req) {
       if (!userData) {
         context.res = {
           status: 400,
-          body: { message: "AU-005" },
+          body: "AU-005",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -282,7 +282,7 @@ module.exports = function (context, req) {
       if (!userData.username || !userData.email || !userData.password) {
         context.res = {
           status: 400,
-          body: 'Required user fields: "username", "password", "email"',
+          body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -291,7 +291,7 @@ module.exports = function (context, req) {
       if (!validator.isEmail(userData.email)) {
         context.res = {
           status: 400,
-          body: "AU-006",
+          body: "AU-007",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -300,7 +300,7 @@ module.exports = function (context, req) {
       if (userData.password.length < 6) {
         context.res = {
           status: 400,
-          body: "AU-009",
+          body: "AU-008",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
