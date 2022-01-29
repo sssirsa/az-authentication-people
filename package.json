@@ -11,8 +11,11 @@
     "atob": "^2.1.2",
     "b64-to-blob": "^1.2.19",
     "based-blob": "^1.0.1",
-    "mongodb": "3.x",
-    "node-blob": "0.0.2"
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^8.5.1",
+    "mongodb": "^3.7.3",
+    "node-blob": "0.0.2",
+    "validator": "^13.7.0"
   },
   "devDependencies": {}
 }
