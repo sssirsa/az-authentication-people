@@ -1,4 +1,3 @@
-// TO DO Update user last access_date 
 
 const mongodb = require("mongodb");
 let mongo_client = null;
@@ -10,7 +9,7 @@ const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const SECRET_JWT_SEED = process.env['SECRET_JWT_SEED'];
+const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -40,6 +39,10 @@ module.exports = function (context, req) {
       if (bcrypt.compareSync(userPassword, user.password)) {
         const token = await generarJWT(user._id, userName);
         const person = await searchPerson(user["person_id"].toString());
+        const date_access = new Date();
+        const userUpdate = { date_access };
+        let query = { _id: mongodb.ObjectID(req.query["user._id"]) };
+        await updateUser(userUpdate, query);
         let response = {
           access_token: token,
           person,
@@ -146,6 +149,34 @@ module.exports = function (context, req) {
                 resolve(docs);
               }
             );
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      });
+    }
+
+    async function updateUser(options, query) {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("users")
+            .updateOne(query, { $set: options }, function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: { "Content-Type": "application/json" },
+                });
+                return;
+              }
+              resolve(docs);
+            });
         } catch (error) {
           reject({
             status: 500,
