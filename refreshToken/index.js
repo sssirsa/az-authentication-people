@@ -1,9 +1,6 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
-const mongodb = require("mongodb");
-let mongo_client = null;
-
 // middlewares
 const jwt = require("jsonwebtoken");
 

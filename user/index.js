@@ -52,6 +52,10 @@ module.exports = function (context, req) {
         context.done();
       }
     } catch (error) {
+      if (error.body) {
+        context.res = error;
+        context.done();
+      }
       context.res = {
         status: 500,
         body: error.toString(),
@@ -81,15 +85,14 @@ module.exports = function (context, req) {
                   headers: { "Content-Type": "application/json" },
                 });
               }
-              if (docs) {
-                resolve(docs);
-              } else {
+              if (docs.length === 0) {
                 reject({
                   status: 404,
                   body: "AU-001",
                   headers: { "Content-Type": "application/json" },
                 });
               }
+              resolve(docs);
             });
         } catch (error) {
           context.log(error);
@@ -122,15 +125,14 @@ module.exports = function (context, req) {
                   headers: { "Content-Type": "application/json" },
                 });
               }
-              if (docs) {
-                resolve(docs);
-              } else {
+              if (docs.length === 0) {
                 reject({
                   status: 404,
                   body: "AU-002",
                   headers: { "Content-Type": "application/json" },
                 });
               }
+              resolve(docs);
             });
         } catch (error) {
           reject({
@@ -210,6 +212,10 @@ module.exports = function (context, req) {
       };
       context.done();
     } catch (error) {
+      if (error.body) {
+        context.res = error;
+        context.done();
+      }
       context.res = {
         status: 500,
         body: error.toString(),
