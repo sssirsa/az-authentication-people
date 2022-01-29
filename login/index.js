@@ -1,4 +1,3 @@
-
 const mongodb = require("mongodb");
 let mongo_client = null;
 
@@ -34,55 +33,65 @@ module.exports = function (context, req) {
     let userName = req.body["username"];
     let userPassword = req.body["password"];
     try {
-      validate();
-      let user = await searchUser();
-      if (bcrypt.compareSync(userPassword, user.password)) {
-        const token = await generarJWT(user._id, userName);
-        const person = await searchPerson(user["person_id"].toString());
-        const date_access = new Date();
-        const userUpdate = { date_access };
-        let query = { _id: mongodb.ObjectID(req.query["user._id"]) };
-        await updateUser(userUpdate, query);
-        let response = {
-          access_token: token,
-          person,
-        };
-        context.res = {
-          status: 200,
-          body: response,
-          headers: { "Content-Type": "application/json" },
-        };
-        context.done();
+      const error = await validate();
+      if (error) {
+        context.res = error;
       } else {
-        context.res = {
-          status: 401,
-          body: "AU-015",
-          headers: { "Content-Type": "application/json" },
-        };
+        let user = await searchUser();
+        if (bcrypt.compareSync(userPassword, user.password)) {
+          const token = await generarJWT(user._id, userName);
+          const person = await searchPerson(user["person_id"].toString());
+          const date_access = new Date();
+          const userUpdate = { date_access };
+          let query = { _id: mongodb.ObjectID(req.query["user._id"]) };
+          await updateUser(userUpdate, query);
+          let response = {
+            access_token: token,
+            person,
+          };
+          context.res = {
+            status: 200,
+            body: response,
+            headers: { "Content-Type": "application/json" },
+          };
+          context.done();
+        } else {
+          context.res = {
+            status: 401,
+            body: "AU-015",
+            headers: { "Content-Type": "application/json" },
+          };
+        }
+      }
+      context.done();
+    } catch (error) {
+      if (error.body) {
+        context.res = error;
         context.done();
       }
-    } catch (error) {
-      context.res = error;
+      context.res = {
+        status: 500,
+        body: error.toString(),
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     }
 
     //Internal functions
     function validate() {
       if (!userName) {
-        context.res = {
+        return {
           status: 400,
           body: { message: "AU-013" },
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       if (!userPassword) {
-        context.res = {
+        return {
           status: 400,
           body: { message: "AU-014" },
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
     }
 
