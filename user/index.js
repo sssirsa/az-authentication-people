@@ -30,15 +30,6 @@ module.exports = function (context, req) {
       break;
   }
 
-  function notAllowed() {
-    context.res = {
-      status: 405,
-      body: "Method not allowed",
-      headers: { "Content-Type": "application/json" },
-    };
-    context.done();
-  }
-
   async function GET_user() {
     let requestedID;
     if (req.query) requestedID = req.query["id"];
@@ -386,7 +377,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .insertOne(person, function (error, docs) {
               if (error) {
                 reject({
@@ -493,17 +484,17 @@ module.exports = function (context, req) {
         if (username) {
           userToWrite["username"] = username;
         }
-        let createResponse = await updateUser(userToWrite, query);
-        if (!createResponse.ops) {
+        let updateResponse = await updateUser(userToWrite, query);
+        if (!updateResponse.ops) {
           context.res = {
             status: 200,
-            body: createResponse,
+            body: updateResponse,
             headers: { "Content-Type": "application/json" },
           };
         } else {
           context.res = {
             status: 200,
-            body: createResponse.ops[0],
+            body: updateResponse.ops[0],
             headers: { "Content-Type": "application/json" },
           };
         }
@@ -633,6 +624,15 @@ module.exports = function (context, req) {
         }
       });
     }
+  }
+
+  function notAllowed() {
+    context.res = {
+      status: 405,
+      body: "Method not allowed",
+      headers: { "Content-Type": "application/json" },
+    };
+    context.done();
   }
 
   function createMongoClient() {

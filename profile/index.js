@@ -1,11 +1,9 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
-const connection_mongoDB =
-  "mongodb+srv://devops:59LzYD00s3q9JK2s@cluster0-qrhyj.mongodb.net?retryWrites=true&w=majority";
-const MONGO_DB_NAME = "management";
-
-const validator = require("validator");
+// database
+const connection_mongoDB = process.env["connection_mongoDB"];
+const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 
 // constants environment
 const AZURE_STORAGE_CONNECTION_STRING =
@@ -60,7 +58,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .aggregate([
               { $match: { _id: mongodb.ObjectID(id) } },
               { $project: { password: 0 } },
@@ -78,7 +76,7 @@ module.exports = function (context, req) {
               } else {
                 reject({
                   status: 404,
-                  body: {},
+                  body: 'AU-011',
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -100,7 +98,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .aggregate([
               {
                 $project: { password: 0 },
@@ -121,10 +119,8 @@ module.exports = function (context, req) {
               } else {
                 reject({
                   status: 404,
-                  body: {},
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
+                  body: 'AU-012',
+                  headers: { "Content-Type": "application/json" },
                 });
               }
             });
@@ -132,9 +128,7 @@ module.exports = function (context, req) {
           reject({
             status: 500,
             body: error.toString(),
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
           });
         }
       });
@@ -233,19 +227,10 @@ module.exports = function (context, req) {
     }
 
     async function validate() {
-      if (personSubsidiaries.length === 0) {
-        //User can not be in a subsidiary and an agency
-        context.res = {
-          status: 400,
-          body: { message: "AU-001" },
-          headers: { "Content-Type": "application/json" },
-        };
-        context.done();
-      }
       if (!personName || !personMiddleName) {
         context.res = {
           status: 400,
-          body: 'Required fields: "nombre", "apellido_paterno"',
+          body: 'AU-004',
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -300,7 +285,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .insertOne(person, function (error, docs) {
               if (error) {
                 reject({
@@ -474,7 +459,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .updateOne(query, { $set: options }, function (error, docs) {
               if (error) {
                 reject({
