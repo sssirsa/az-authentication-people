@@ -232,7 +232,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("subsidiaries")
+            .collection("subsidiary")
             .findOne(
               { _id: mongodb.ObjectId(subsidiaryId) },
               function (error, docs) {
