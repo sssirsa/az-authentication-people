@@ -1,21 +1,13 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
-const connection_mongoDB =
-  "mongodb+srv://devops:59LzYD00s3q9JK2s@cluster0-qrhyj.mongodb.net?retryWrites=true&w=majority";
-const MONGO_DB_NAME = "management";
+const mongodb = require("mongodb");
+let mongo_client = null;
 
 // middlewares
-const bcrypt = require("bcryptjs");
-const validator = require("validator");
 const jwt = require("jsonwebtoken");
 
-// constants environment
-const AZURE_STORAGE_CONNECTION_STRING =
-  process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
-const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
-
-const SECRET_JWT_SEED = "e201994dca9320fc94336603b1cfc970";
+const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -52,7 +44,7 @@ module.exports = function (context, req) {
       } else {
         context.res = {
           status: 405,
-          body: "Token error",
+          body: "AU-016",
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -72,7 +64,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .findOne({ username: name }, function (error, docs) {
               if (error) {
                 reject({
@@ -85,7 +77,7 @@ module.exports = function (context, req) {
               if (!docs) {
                 reject({
                   status: 401,
-                  body: "Invalid username",
+                  body: "AU-001",
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -107,7 +99,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("profiles_test")
+            .collection("profiles")
             .findOne(
               { _id: mongodb.ObjectID(personId) },
               function (error, docs) {
@@ -122,7 +114,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 401,
-                    body: "Not found person",
+                    body: "AU-011",
                     headers: { "Content-Type": "application/json" },
                   });
                 }

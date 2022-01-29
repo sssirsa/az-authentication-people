@@ -1,3 +1,5 @@
+// TO DO Update user last access_date 
+
 const mongodb = require("mongodb");
 let mongo_client = null;
 
