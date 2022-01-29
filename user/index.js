@@ -155,61 +155,63 @@ module.exports = function (context, req) {
     let personAvatar = req.body["foto"];
     let userData = req.body["user"];
     let userPermissions = req.body["permissions"];
-
-    validate();
-
     try {
-      let subsidiaries = [];
-      let personAvatarUrl;
+      const error = await validate();
+      if (error) {
+        context.res = error;
+      } else {
+        let subsidiaries = [];
+        let personAvatarUrl;
 
-      // get subsidiaries if user has
-      if (personSubsidiaries) {
-        for (let id of personSubsidiaries) {
-          if (id.length === 24) {
-            const subs = await searchSubsidiary(id);
-            subsidiaries.push(subs);
+        // get subsidiaries if user has
+        if (personSubsidiaries) {
+          for (let id of personSubsidiaries) {
+            if (id.length === 24) {
+              const subs = await searchSubsidiary(id);
+              subsidiaries.push(subs);
+            }
           }
         }
+
+        person = {
+          nombre: personName,
+          apellido_paterno: personMiddleName,
+          apellido_materno: personLastName,
+          sucursal: subsidiaries,
+          foto: personAvatarUrl,
+          permissions: userPermissions,
+        };
+
+        let response = await writePerson(person);
+
+        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+
+        let passwordObject = generatePasswordHash(userData.password);
+        const dateCreate = new Date();
+
+        let userToWrite = {
+          dateCreate,
+          email: userData.email,
+          is_active: true,
+          last_access: null,
+          last_modify: null,
+          password: passwordObject,
+          person_id: response["_id"],
+          username: userData.username,
+        };
+
+        let user = await writeUser(userToWrite);
+
+        response["user"] = user;
+
+        delete response.user.password;
+
+        context.res = {
+          status: 201,
+          body: response,
+          headers: { "Content-Type": "application/json" },
+        };
       }
-
-      person = {
-        nombre: personName,
-        apellido_paterno: personMiddleName,
-        apellido_materno: personLastName,
-        sucursal: subsidiaries,
-        foto: personAvatarUrl,
-        permissions: userPermissions,
-      };
-
-      let response = await writePerson(person);
-
-      if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
-
-      let passwordObject = generatePasswordHash(userData.password);
-      const dateCreate = new Date();
-
-      let userToWrite = {
-        dateCreate,
-        email: userData.email,
-        is_active: true,
-        last_access: null,
-        last_modify: null,
-        password: passwordObject,
-        person_id: response["_id"],
-        username: userData.username,
-      };
-
-      let user = await writeUser(userToWrite);
-
-      response["user"] = user;
-
-      delete response.user.password;
-
-      context.res = {
-        status: 201,
-        body: response,
-        headers: { "Content-Type": "application/json" },
-      };
       context.done();
     } catch (error) {
       if (error.body) {
@@ -268,16 +270,15 @@ module.exports = function (context, req) {
     async function validate() {
       // check person names
       if (!personName || !personMiddleName) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-004",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // check object userData
       if (!userData) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-005",
           headers: { "Content-Type": "application/json" },
@@ -286,53 +287,49 @@ module.exports = function (context, req) {
       }
       // check fields in userData
       if (!userData.username || !userData.email || !userData.password) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // check is email is valid
       if (!validator.isEmail(userData.email)) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-007",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // check password length
       if (userData.password.length < 6) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-008",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // search user by email
       let query = { email: userData.email };
       const user = await searchUser(query);
       if (user) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-009",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // search user by user_name
       query = { username: userData.username };
       const userbyName = await searchUser(query);
       if (userbyName) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-010",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
+      return;
     }
 
     async function writeBlob(base64String) {
@@ -438,7 +435,8 @@ module.exports = function (context, req) {
       return bcrypt.hashSync(userpassword, salt);
     }
 
-    function searchUser(query) {
+    async function searchUser(query) {
+      await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
           mongo_client
@@ -471,45 +469,51 @@ module.exports = function (context, req) {
     let password = req.body["password"];
     let username = req.body["username"];
     let email = req.body["email"];
-    validate();
+    const error = await validate();
     try {
-      if (req.query["id"]) {
-        let query = { _id: mongodb.ObjectID(req.query["id"]) };
-
-        const date = new Date();
-
-        let userToWrite = {
-          last_modify: date,
-        };
-        if (password) {
-          userToWrite["password"] = generatePasswordHash(password);
-        }
-        if (email) {
-          userToWrite["email"] = email;
-        }
-        if (username) {
-          userToWrite["username"] = username;
-        }
-        let updateResponse = await updateUser(userToWrite, query);
-        if (!updateResponse.ops) {
-          context.res = {
-            status: 200,
-            body: updateResponse,
-            headers: { "Content-Type": "application/json" },
-          };
-        } else {
-          context.res = {
-            status: 200,
-            body: updateResponse.ops[0],
-            headers: { "Content-Type": "application/json" },
-          };
-        }
+      if (error) {
+        context.res = error;
+        console.log(error);
       } else {
-        throw (context.res = {
-          status: 404,
-          body: "AU-001",
-          headers: { "Content-Type": "application/json" },
-        });
+        if (req.query["id"]) {
+          let query = { _id: mongodb.ObjectID(req.query["id"]) };
+
+          const date = new Date();
+
+          let userToWrite = {
+            last_modify: date,
+          };
+          if (password) {
+            userToWrite["password"] = generatePasswordHash(password);
+          }
+          if (email) {
+            userToWrite["email"] = email;
+          }
+          if (username) {
+            userToWrite["username"] = username;
+          }
+          let updateResponse = await updateUser(userToWrite, query);
+          console.log(updateResponse);
+          if (!updateResponse.ops) {
+            context.res = {
+              status: 200,
+              body: updateResponse,
+              headers: { "Content-Type": "application/json" },
+            };
+          } else {
+            context.res = {
+              status: 200,
+              body: updateResponse.ops[0],
+              headers: { "Content-Type": "application/json" },
+            };
+          }
+        } else {
+          throw (context.res = {
+            status: 404,
+            body: "AU-001",
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       }
       context.done();
     } catch (error) {
@@ -528,32 +532,29 @@ module.exports = function (context, req) {
     // internal functions
     async function validate() {
       if (email && !validator.isEmail(email)) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       if (password && password.length < 6) {
-        context.res = {
+        return {
           status: 400,
           body: "AU-009",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
       // search user by email
       if (email) {
         let query = { email };
         const user = await searchUser(query);
         if (user) {
-          context.res = {
+          return {
             status: 400,
             body: "AU-009",
             headers: { "Content-Type": "application/json" },
           };
-          context.done();
         }
       }
       // search user by user_name
@@ -561,14 +562,14 @@ module.exports = function (context, req) {
         let query = { username };
         const user = await searchUser(query);
         if (user) {
-          context.res = {
+          return {
             status: 400,
             body: "AU-010",
             headers: { "Content-Type": "application/json" },
           };
-          context.done();
         }
       }
+      return;
     }
 
     function generatePasswordHash(userpassword) {
@@ -576,7 +577,8 @@ module.exports = function (context, req) {
       return bcrypt.hashSync(userpassword, salt);
     }
 
-    function searchUser(query) {
+    async function searchUser(query) {
+      await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
           mongo_client
