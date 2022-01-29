@@ -139,8 +139,6 @@ module.exports = function (context, req) {
           },
           (error, token) => {
             if (error) {
-              // todo mal
-              console.log(error);
               reject(error);
             } else {
               resolve(token);
