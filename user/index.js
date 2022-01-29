@@ -411,7 +411,7 @@ module.exports = function (context, req) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
-            .collection("usuarios")
+            .collection("users")
             .insertOne(user, function (error, docs) {
               if (error) {
                 reject({
