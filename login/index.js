@@ -41,9 +41,9 @@ module.exports = function (context, req) {
         if (bcrypt.compareSync(userPassword, user.password)) {
           const token = await generarJWT(user._id, userName);
           const person = await searchPerson(user["person_id"].toString());
-          const date_access = new Date();
-          const userUpdate = { date_access };
-          let query = { _id: mongodb.ObjectID(req.query["user._id"]) };
+          const last_access = new Date();
+          const userUpdate = { last_access };
+          let query = { _id: mongodb.ObjectID(user._id) };
           await updateUser(userUpdate, query);
           let response = {
             access_token: token,

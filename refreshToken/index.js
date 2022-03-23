@@ -1,10 +1,13 @@
 const mongodb = require("mongodb");
 let mongo_client = null;
 
+// database
+const connection_mongoDB = process.env["connection_mongoDB"];
+const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
+const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
+
 // middlewares
 const jwt = require("jsonwebtoken");
-
-const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -19,13 +22,17 @@ module.exports = function (context, req) {
   async function GET_refreshToken() {
     try {
       let token;
-      if (req.headers.authorization.startsWith("Bearer ")) {
-        const authHeader = req.headers.authorization;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Baerer ")) {
         token = authHeader.substring(7, authHeader.length);
         const { uid, name } = jwt.verify(token, SECRET_JWT_SEED);
         const newToken = await generarJWT(uid, name);
         let user = await searchUser(name);
         const person = await searchPerson(user["person_id"].toString());
+        const last_access = new Date();
+        const userUpdate = { last_access };
+        let query = { _id: mongodb.ObjectID(uid) };
+        await updateUser(userUpdate, query);
         let response = {
           access_token: newToken,
           person,
@@ -33,14 +40,12 @@ module.exports = function (context, req) {
         context.res = {
           status: 200,
           body: response,
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
         };
         context.done();
       } else {
         context.res = {
-          status: 405,
+          status: 400,
           body: "AU-016",
           headers: { "Content-Type": "application/json" },
         };
@@ -118,6 +123,34 @@ module.exports = function (context, req) {
                 resolve(docs);
               }
             );
+        } catch (error) {
+          reject({
+            status: 500,
+            body: error.toString(),
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      });
+    }
+
+    async function updateUser(options, query) {
+      await createMongoClient();
+      return new Promise(function (resolve, reject) {
+        try {
+          mongo_client
+            .db(MONGO_DB_NAME)
+            .collection("users")
+            .updateOne(query, { $set: options }, function (error, docs) {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: { "Content-Type": "application/json" },
+                });
+                return;
+              }
+              resolve(docs);
+            });
         } catch (error) {
           reject({
             status: 500,

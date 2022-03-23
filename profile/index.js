@@ -9,6 +9,8 @@ const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
+const ONE_MINUTE = 60 * 1000;
+
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -180,6 +182,7 @@ module.exports = function (context, req) {
       }
       context.done();
     } catch (error) {
+      context.log(error);
       context.res = {
         status: 500,
         body: error.toString(),
@@ -272,6 +275,7 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
+        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),
@@ -317,51 +321,46 @@ module.exports = function (context, req) {
     let personLastName = req.body["apellido_materno"];
     let personAvatar = req.body["foto"];
     let userPermissions = req.body["permissions"];
-    const error = await validate();
     try {
-      if (error) {
-        context.res = error;
-      } else {
-        if (req.query["id"]) {
-          let subsidiaries = [];
-          let personAvatarUrl;
-          let query = { _id: mongodb.ObjectID(req.query["id"]) };
+      if (req.query["id"]) {
+        let subsidiaries = [];
+        let personAvatarUrl;
+        let query = { _id: mongodb.ObjectID(req.query["id"]) };
 
-          if (personSubsidiaries) {
-            for (let id of personSubsidiaries) {
-              if (id.length === 24) {
-                const subs = await searchSubsidiary(id);
-                subsidiaries.push(subs);
-              }
+        if (personSubsidiaries) {
+          for (let id of personSubsidiaries) {
+            if (id.length === 24) {
+              const subs = await searchSubsidiary(id);
+              subsidiaries.push(subs);
             }
           }
+        }
 
-          if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
 
-          if (personName) person["nombre"] = personName;
-          if (personMiddleName) person["apellido_paterno"] = personMiddleName;
-          if (personLastName) person["apellido_materno"] = personLastName;
-          if (userPermissions) person["permissions"] = userPermissions;
-          if (subsidiaries.length > 0) person["sucursal"] = subsidiaries;
-          if (personAvatarUrl) person["foto"] = personAvatarUrl;
+        if (personName) person["nombre"] = personName;
+        if (personMiddleName) person["apellido_paterno"] = personMiddleName;
+        if (personLastName) person["apellido_materno"] = personLastName;
+        if (userPermissions) person["permissions"] = userPermissions;
+        if (subsidiaries.length > 0) person["sucursal"] = subsidiaries;
+        if (personAvatarUrl) person["foto"] = personAvatarUrl;
 
-          let response = await writePerson(person, query);
+        let response = await writePerson(person, query);
 
-          if (!response.ops) {
-            context.res = {
-              status: 200,
-              body: response,
-              headers: { "Content-Type": "application/json" },
-            };
-          }
-          context.done();
-        } else {
+        if (!response.ops) {
           context.res = {
-            status: 500,
-            body: error.toString(),
+            status: 200,
+            body: response,
             headers: { "Content-Type": "application/json" },
           };
         }
+        context.done();
+      } else {
+        context.res = {
+          status: 500,
+          body: "AU-011",
+          headers: { "Content-Type": "application/json" },
+        };
       }
       context.done();
     } catch (error) {
@@ -451,6 +450,7 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
+        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),
