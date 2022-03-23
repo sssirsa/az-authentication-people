@@ -13,6 +13,7 @@ const validator = require("validator");
 const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
+const ONE_MINUTE = 60 * 1000;
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -173,6 +174,8 @@ module.exports = function (context, req) {
           }
         }
 
+        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+
         person = {
           nombre: personName,
           apellido_paterno: personMiddleName,
@@ -184,9 +187,8 @@ module.exports = function (context, req) {
 
         let response = await writePerson(person);
 
-        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
-
         let passwordObject = generatePasswordHash(userData.password);
+
         const dateCreate = new Date();
 
         let userToWrite = {
@@ -214,6 +216,7 @@ module.exports = function (context, req) {
       }
       context.done();
     } catch (error) {
+      context.log(error)
       if (error.body) {
         context.res = error;
         context.done();
@@ -366,6 +369,7 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
+        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),

@@ -5,11 +5,12 @@ let mongo_client = null;
 const connection_mongoDB = process.env["connection_mongoDB"];
 const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 
-
 // constants environment
 const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
+const ONE_MINUTE = 60 * 1000;
+
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -181,6 +182,7 @@ module.exports = function (context, req) {
       }
       context.done();
     } catch (error) {
+      context.log(error);
       context.res = {
         status: 500,
         body: error.toString(),
@@ -273,6 +275,7 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
+        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),
@@ -447,6 +450,7 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
+        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),
