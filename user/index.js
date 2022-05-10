@@ -1,19 +1,18 @@
+const bcrypt = require("bcryptjs");
 const mongodb = require("mongodb");
-let mongo_client = null;
+const validator = require("validator");
 
-// database
+//? Database constants enviroment
 const connection_mongoDB = process.env["connection_mongoDB"];
 const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 
-// middlewares
-const bcrypt = require("bcryptjs");
-const validator = require("validator");
-
-// constants environment
+//? Azure constants environment
 const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
+
 const ONE_MINUTE = 60 * 1000;
+let mongo_client = null;
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -31,27 +30,37 @@ module.exports = function (context, req) {
       break;
   }
 
+  function notAllowed() {
+    context.res = {
+      status: 405,
+      body: "Method not allowed",
+      headers: { "Content-Type": "application/json" },
+    };
+    context.done();
+  }
+
   async function GET_user() {
     let requestedID;
     if (req.query) requestedID = req.query["id"];
     try {
-      // search user by Id
-      if (requestedID) {
-        let person = await getUsers(requestedID);
+      //? get all
+      if (!requestedID) {
+        let person = await getUsers();
         context.res = {
+          status: 200,
           body: person,
           headers: { "Content-Type": "application/json" },
         };
         context.done();
-        // search all users
-      } else {
-        let people = await getUser();
-        context.res = {
-          body: people,
-          headers: { "Content-Type": "application/json" },
-        };
-        context.done();
       }
+      //? search user by Id
+      let person = await getUser(requestedID);
+      context.res = {
+        status: 200,
+        body: person,
+        headers: { "Content-Type": "application/json" },
+      };
+      context.done();
     } catch (error) {
       if (error.body) {
         context.res = error;
@@ -65,9 +74,8 @@ module.exports = function (context, req) {
       context.done();
     }
 
-    // Internal functions
-
-    async function getUsers(id) {
+    //? Internal functions
+    async function getUser(id) {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
@@ -96,7 +104,6 @@ module.exports = function (context, req) {
               resolve(docs);
             });
         } catch (error) {
-          context.log(error);
           reject({
             status: 500,
             body: error.toString(),
@@ -106,7 +113,7 @@ module.exports = function (context, req) {
       });
     }
 
-    async function getUser() {
+    async function getUsers() {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
         try {
@@ -148,75 +155,73 @@ module.exports = function (context, req) {
 
   async function POST_user() {
     let person;
-    // get variables from body
-    let personSubsidiaries = req.body["sucursal"];
-    let personName = req.body["nombre"];
-    let personMiddleName = req.body["apellido_paterno"];
-    let personLastName = req.body["apellido_materno"];
-    let personAvatar = req.body["foto"];
-    let userData = req.body["user"];
-    let userPermissions = req.body["permissions"];
+    //? get variables from body
+    const {
+      sucursal: personSubsidiaries,
+      nombre: personName,
+      apellido_paterno: personMiddleName,
+      apellido_materno: personLastName,
+      foto: personAvatar,
+      user: userData,
+      permissions: userPermissions,
+    } = req.body;
+
     try {
       const error = await validate();
+      //! validation error
       if (error) {
         context.res = error;
-      } else {
-        let subsidiaries = [];
-        let personAvatarUrl;
+        context.done();
+      }
+      let subsidiaries = [];
+      let personAvatarUrl;
 
-        // get subsidiaries if user has
-        if (personSubsidiaries) {
-          for (let id of personSubsidiaries) {
-            if (id.length === 24) {
-              const subs = await searchSubsidiary(id);
-              subsidiaries.push(subs);
-            }
+      //? get subsidiaries if user has
+      if (personSubsidiaries) {
+        for (let id of personSubsidiaries) {
+          if (id.length === 24) {
+            const subs = await searchSubsidiary(id);
+            subsidiaries.push(subs);
           }
         }
-
-        if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
-
-        person = {
-          nombre: personName,
-          apellido_paterno: personMiddleName,
-          apellido_materno: personLastName,
-          sucursal: subsidiaries,
-          foto: personAvatarUrl,
-          permissions: userPermissions,
-        };
-
-        let response = await writePerson(person);
-
-        let passwordObject = generatePasswordHash(userData.password);
-
-        const dateCreate = new Date();
-
-        let userToWrite = {
-          dateCreate,
-          email: userData.email,
-          is_active: true,
-          last_access: null,
-          last_modify: null,
-          password: passwordObject,
-          person_id: response["_id"],
-          username: userData.username,
-        };
-
-        let user = await writeUser(userToWrite);
-
-        response["user"] = user;
-
-        delete response.user.password;
-
-        context.res = {
-          status: 201,
-          body: response,
-          headers: { "Content-Type": "application/json" },
-        };
       }
+
+      if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
+      person = {
+        nombre: personName,
+        apellido_paterno: personMiddleName,
+        apellido_materno: personLastName,
+        sucursal: subsidiaries,
+        foto: personAvatarUrl,
+        permissions: userPermissions,
+      };
+
+      let response = await writePerson(person);
+      let passwordObject = generatePasswordHash(userData.password);
+      const dateCreate = new Date();
+
+      let userToWrite = {
+        dateCreate,
+        email: userData.email,
+        is_active: true,
+        last_access: null,
+        last_modify: null,
+        password: passwordObject,
+        person_id: response["_id"],
+        username: userData.username,
+      };
+
+      let user = await writeUser(userToWrite);
+      response["user"] = user;
+      delete response.user.password;
+
+      context.res = {
+        status: 201,
+        body: response,
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     } catch (error) {
-      context.log(error)
       if (error.body) {
         context.res = error;
         context.done();
@@ -229,8 +234,7 @@ module.exports = function (context, req) {
       context.done();
     }
 
-    // Internal Functions
-
+    //? Internal Functions
     async function searchSubsidiary(subsidiaryId) {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
@@ -247,7 +251,6 @@ module.exports = function (context, req) {
                     body: error,
                     headers: { "Content-Type": "application/json" },
                   });
-                  return;
                 }
                 if (!docs) {
                   reject({
@@ -260,7 +263,6 @@ module.exports = function (context, req) {
               }
             );
         } catch (error) {
-          context.log(error);
           reject({
             status: 500,
             body: error.toString(),
@@ -271,7 +273,7 @@ module.exports = function (context, req) {
     }
 
     async function validate() {
-      // check person names
+      //! check person names
       if (!personName || !personMiddleName) {
         return {
           status: 400,
@@ -279,24 +281,24 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      // check object userData
+      //! check object userData
       if (!userData) {
         return {
           status: 400,
           body: "AU-005",
           headers: { "Content-Type": "application/json" },
         };
-        context.done();
       }
-      // check fields in userData
-      if (!userData.username || !userData.email || !userData.password) {
+      //! check fields in userData
+      const { username, email, password } = userData;
+      if (!username || !email || !password) {
         return {
           status: 400,
           body: "AU-006",
           headers: { "Content-Type": "application/json" },
         };
       }
-      // check is email is valid
+      //! check is email is valid
       if (!validator.isEmail(userData.email)) {
         return {
           status: 400,
@@ -304,7 +306,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      // check password length
+      //! check password length
       if (userData.password.length < 6) {
         return {
           status: 400,
@@ -312,7 +314,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      // search user by email
+      //! search user by email
       let query = { email: userData.email };
       const user = await searchUser(query);
       if (user) {
@@ -322,7 +324,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      // search user by user_name
+      //! search user by user_name
       query = { username: userData.username };
       const userbyName = await searchUser(query);
       if (userbyName) {
@@ -332,17 +334,16 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      return;
     }
 
     async function writeBlob(base64String) {
-      //Local imports
+      //? Local imports
+      const { AbortController } = require("@azure/abort-controller");
       const { BlobServiceClient } = require("@azure/storage-blob");
+      const b64toBlob = require("b64-to-blob");
+      const containerName = "person-avatar";
       global.atob = require("atob");
       global.Blob = require("node-blob");
-      const b64toBlob = require("b64-to-blob");
-      const { AbortController } = require("@azure/abort-controller");
-      const containerName = "person-avatar";
 
       var base64Data = base64String.split(";base64,").pop();
       var contentType = base64String
@@ -369,7 +370,6 @@ module.exports = function (context, req) {
         await blockBlobClient.upload(blobImage.buffer, blobImage.size, aborter);
         return storageUrl + "/" + containerName + "/" + blobName;
       } catch (e) {
-        context.log(e);
         throw new Error({
           status: 500,
           body: e.toString(),
@@ -392,7 +392,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs.ops[0]);
             });
@@ -420,7 +419,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs.ops[0]);
             });
@@ -453,7 +451,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs);
             });
@@ -469,70 +466,66 @@ module.exports = function (context, req) {
   }
 
   async function PUT_user() {
-    // get variables from body
-    let password = req.body["password"];
-    let username = req.body["username"];
-    let email = req.body["email"];
+    //? get variables from body
+    const { password, username, email } = req.body;
+    const { id } = req.query;
     const error = await validate();
     try {
+      //! validation error
       if (error) {
         context.res = error;
-      } else {
-        if (req.query["id"]) {
-          let query = { _id: mongodb.ObjectID(req.query["id"]) };
-
-          const date = new Date();
-
-          let userToWrite = {
-            last_modify: date,
-          };
-          if (password) {
-            userToWrite["password"] = generatePasswordHash(password);
-          }
-          if (email) {
-            userToWrite["email"] = email;
-          }
-          if (username) {
-            userToWrite["username"] = username;
-          }
-          let updateResponse = await updateUser(userToWrite, query);
-          if (!updateResponse.ops) {
-            context.res = {
-              status: 200,
-              body: updateResponse,
-              headers: { "Content-Type": "application/json" },
-            };
-          } else {
-            context.res = {
-              status: 200,
-              body: updateResponse.ops[0],
-              headers: { "Content-Type": "application/json" },
-            };
-          }
-        } else {
-          throw (context.res = {
-            status: 404,
-            body: "AU-001",
-            headers: { "Content-Type": "application/json" },
-          });
-        }
+        context.done();
       }
+
+      //! not id match
+      if (!id) {
+        throw (context.res = {
+          status: 404,
+          body: "AU-001",
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      let query = { _id: mongodb.ObjectID(req.query["id"]) };
+      const date = new Date();
+
+      let userToWrite = { last_modify: date };
+      if (password) userToWrite["password"] = generatePasswordHash(password);
+      if (email) userToWrite["email"] = email;
+      if (username) userToWrite["username"] = username;
+      let updateResponse = await updateUser(userToWrite, query);
+
+      if (!updateResponse.ops) {
+        context.res = {
+          status: 200,
+          body: updateResponse,
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+      context.res = {
+        status: 200,
+        body: updateResponse.ops[0],
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     } catch (error) {
       if (error.status) {
         context.res = error;
-      } else {
-        context.res = {
-          status: 500,
-          body: error.toString(),
-          headers: { "Content-Type": "application/json" },
-        };
+        context.done();
       }
+
+      context.res = {
+        status: 500,
+        body: error.toString(),
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     }
 
-    // internal functions
+    //? internal functions
     async function validate() {
+      //! email validation
       if (email && !validator.isEmail(email)) {
         return {
           status: 400,
@@ -540,6 +533,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
+      //! password validation
       if (password && password.length < 6) {
         return {
           status: 400,
@@ -547,7 +541,7 @@ module.exports = function (context, req) {
           headers: { "Content-Type": "application/json" },
         };
       }
-      // search user by email
+      //! search user by email
       if (email) {
         let query = { email };
         const user = await searchUser(query);
@@ -559,7 +553,7 @@ module.exports = function (context, req) {
           };
         }
       }
-      // search user by user_name
+      //! search user by user_name
       if (username) {
         let query = { username };
         const user = await searchUser(query);
@@ -571,7 +565,6 @@ module.exports = function (context, req) {
           };
         }
       }
-      return;
     }
 
     function generatePasswordHash(userpassword) {
@@ -593,7 +586,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs);
             });
@@ -621,7 +613,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs);
             });
@@ -636,30 +627,25 @@ module.exports = function (context, req) {
     }
   }
 
-  function notAllowed() {
-    context.res = {
-      status: 405,
-      body: "Method not allowed",
-      headers: { "Content-Type": "application/json" },
-    };
-    context.done();
-  }
-
+  //? Global functions
   function createMongoClient() {
     return new Promise(function (resolve, reject) {
-      if (mongo_client) resolve();
-      mongodb.MongoClient.connect(
-        connection_mongoDB,
-        {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-        },
-        function (error, _mongo_client) {
-          if (error) reject(error);
-          mongo_client = _mongo_client;
-          resolve();
-        }
-      );
+      if (!mongo_client) {
+        mongodb.MongoClient.connect(
+          connection_mongoDB,
+          {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+          },
+          function (error, _mongo_client) {
+            if (error) reject(error);
+            mongo_client = _mongo_client;
+            resolve();
+          }
+        );
+      }
+      //* already mongo_client exists
+      resolve();
     });
   }
 };

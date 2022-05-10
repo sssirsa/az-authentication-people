@@ -1,13 +1,12 @@
+const jwt = require("jsonwebtoken");
 const mongodb = require("mongodb");
-let mongo_client = null;
 
-// database
+//? database environment variables
 const connection_mongoDB = process.env["connection_mongoDB"];
 const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
 
-// middlewares
-const jwt = require("jsonwebtoken");
+let mongo_client = null;
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -23,27 +22,8 @@ module.exports = function (context, req) {
     try {
       let token;
       const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith("Baerer ")) {
-        token = authHeader.substring(7, authHeader.length);
-        const { uid, name } = jwt.verify(token, SECRET_JWT_SEED);
-        const newToken = await generarJWT(uid, name);
-        let user = await searchUser(name);
-        const person = await searchPerson(user["person_id"].toString());
-        const last_access = new Date();
-        const userUpdate = { last_access };
-        let query = { _id: mongodb.ObjectID(uid) };
-        await updateUser(userUpdate, query);
-        let response = {
-          access_token: newToken,
-          person,
-        };
-        context.res = {
-          status: 200,
-          body: response,
-          headers: { "Content-Type": "application/json" },
-        };
-        context.done();
-      } else {
+      //! not token sended in headers
+      if (!authHeader || !authHeader.startsWith("Baerer ")) {
         context.res = {
           status: 400,
           body: "AU-016",
@@ -51,6 +31,22 @@ module.exports = function (context, req) {
         };
         context.done();
       }
+      token = authHeader.substring(7, authHeader.length);
+      const { uid, name } = jwt.verify(token, SECRET_JWT_SEED);
+      const access_token = await generateJWT(uid, name);
+      let user = await searchUser(name);
+      const person = await searchPerson(user["person_id"].toString());
+      const last_access = new Date();
+      const userUpdate = { last_access };
+      let query = { _id: mongodb.ObjectID(uid) };
+      await updateUser(userUpdate, query);
+      let response = { access_token, person };
+      context.res = {
+        status: 200,
+        body: response,
+        headers: { "Content-Type": "application/json" },
+      };
+      context.done();
     } catch (error) {
       context.res = {
         status: 500,
@@ -74,7 +70,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               if (!docs) {
                 reject({
@@ -111,7 +106,6 @@ module.exports = function (context, req) {
                     body: error.toString(),
                     headers: { "Content-Type": "application/json" },
                   });
-                  return;
                 }
                 if (!docs) {
                   reject({
@@ -147,7 +141,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs);
             });
@@ -161,7 +154,7 @@ module.exports = function (context, req) {
       });
     }
 
-    async function generarJWT(uid, name) {
+    async function generateJWT(uid, name) {
       const payload = { uid, name };
       return new Promise((resolve, reject) => {
         jwt.sign(
@@ -171,11 +164,7 @@ module.exports = function (context, req) {
             expiresIn: "24h",
           },
           (error, token) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(token);
-            }
+            error ? reject(error) : resolve(token);
           }
         );
       });
@@ -191,7 +180,7 @@ module.exports = function (context, req) {
     context.done();
   }
 
-  //Internal globals
+  //? Internal globals
   function createMongoClient() {
     return new Promise(function (resolve, reject) {
       if (!mongo_client) {
@@ -207,9 +196,9 @@ module.exports = function (context, req) {
             resolve();
           }
         );
-      } else {
-        resolve();
       }
+      //* already mongo_client exists
+      resolve();
     });
   }
 };

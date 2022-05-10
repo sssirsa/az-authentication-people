@@ -1,14 +1,13 @@
-const mongodb = require("mongodb");
-let mongo_client = null;
-
-// database
-const connection_mongoDB = process.env["connection_mongoDB"];
-const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
-
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongodb = require("mongodb");
 
+//? database environment variables
+const connection_mongoDB = process.env["connection_mongoDB"];
+const MONGO_DB_NAME = process.env["MONGO_DB_NAME"];
 const SECRET_JWT_SEED = process.env["SECRET_JWT_SEED"];
+
+let mongo_client = null;
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -29,40 +28,43 @@ module.exports = function (context, req) {
     context.done();
   }
 
+  //? HTTP Requests
   async function POST_login() {
-    let userName = req.body["username"];
-    let userPassword = req.body["password"];
+    let { username: userName, password: userPassword } = req.body;
+
     try {
       const error = await validate();
+      //! error in validation
       if (error) {
         context.res = error;
-      } else {
-        let user = await searchUser();
-        if (bcrypt.compareSync(userPassword, user.password)) {
-          const token = await generarJWT(user._id, userName);
-          const person = await searchPerson(user["person_id"].toString());
-          const last_access = new Date();
-          const userUpdate = { last_access };
-          let query = { _id: mongodb.ObjectID(user._id) };
-          await updateUser(userUpdate, query);
-          let response = {
-            access_token: token,
-            person,
-          };
-          context.res = {
-            status: 200,
-            body: response,
-            headers: { "Content-Type": "application/json" },
-          };
-          context.done();
-        } else {
-          context.res = {
-            status: 401,
-            body: "AU-015",
-            headers: { "Content-Type": "application/json" },
-          };
-        }
+        context.done();
       }
+
+      const user = await searchUser();
+      //! password not match
+      if (!bcrypt.compareSync(userPassword, user.password)) {
+        context.res = {
+          status: 401,
+          body: "AU-015",
+          headers: { "Content-Type": "application/json" },
+        };
+        context.done();
+      }
+
+      const access_token = await generateJWT(user._id, userName);
+      const person = await searchPerson(user["person_id"].toString());
+      const last_access = new Date();
+      const userUpdate = { last_access };
+      const query = { _id: mongodb.ObjectID(user._id) };
+      await updateUser(userUpdate, query);
+
+      //* success response
+      const response = { access_token, person };
+      context.res = {
+        status: 200,
+        body: response,
+        headers: { "Content-Type": "application/json" },
+      };
       context.done();
     } catch (error) {
       if (error.body) {
@@ -77,7 +79,7 @@ module.exports = function (context, req) {
       context.done();
     }
 
-    //Internal functions
+    //? Internal functions
     function validate() {
       if (!userName) {
         return {
@@ -109,7 +111,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               if (!docs) {
                 reject({
@@ -146,7 +147,6 @@ module.exports = function (context, req) {
                     body: error.toString(),
                     headers: { "Content-Type": "application/json" },
                   });
-                  return;
                 }
                 if (!docs) {
                   reject({
@@ -182,7 +182,6 @@ module.exports = function (context, req) {
                   body: error.toString(),
                   headers: { "Content-Type": "application/json" },
                 });
-                return;
               }
               resolve(docs);
             });
@@ -196,7 +195,7 @@ module.exports = function (context, req) {
       });
     }
 
-    async function generarJWT(uid, name) {
+    async function generateJWT(uid, name) {
       const payload = { uid, name };
       return new Promise((resolve, reject) => {
         jwt.sign(
@@ -206,18 +205,14 @@ module.exports = function (context, req) {
             expiresIn: "24h",
           },
           (error, token) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(token);
-            }
+            error ? reject(error) : resolve(token);
           }
         );
       });
     }
   }
 
-  //Internal globals
+  //? Global functions
   function createMongoClient() {
     return new Promise(function (resolve, reject) {
       if (!mongo_client) {
@@ -233,9 +228,9 @@ module.exports = function (context, req) {
             resolve();
           }
         );
-      } else {
-        resolve();
       }
+      //* already mongo_client exists
+      resolve();
     });
   }
 };
