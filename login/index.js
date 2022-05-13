@@ -22,7 +22,7 @@ module.exports = function (context, req) {
   function notAllowed() {
     context.res = {
       status: 405,
-      body: "Method not allowed",
+      body: { code: "AU-017" },
       headers: { "Content-Type": "application/json" },
     };
     context.done();
@@ -45,7 +45,7 @@ module.exports = function (context, req) {
       if (!bcrypt.compareSync(userPassword, user.password)) {
         context.res = {
           status: 401,
-          body: "AU-015",
+          body: { code: "AU-015" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -84,14 +84,14 @@ module.exports = function (context, req) {
       if (!userName) {
         return {
           status: 400,
-          body: { message: "AU-013" },
+          body: { code: "AU-013" },
           headers: { "Content-Type": "application/json" },
         };
       }
       if (!userPassword) {
         return {
           status: 400,
-          body: { message: "AU-014" },
+          body: { code: "AU-014" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -99,12 +99,12 @@ module.exports = function (context, req) {
 
     async function searchUser() {
       await createMongoClient();
-      return new Promise(function (resolve, reject) {
+      return new Promise((resolve, reject) => {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .findOne({ username: userName }, function (error, docs) {
+            .findOne({ username: userName }, (error, docs) => {
               if (error) {
                 reject({
                   status: 500,
@@ -115,7 +115,7 @@ module.exports = function (context, req) {
               if (!docs) {
                 reject({
                   status: 401,
-                  body: "AU-001",
+                  body: { code: "AU-001" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -133,31 +133,28 @@ module.exports = function (context, req) {
 
     async function searchPerson(personId) {
       await createMongoClient();
-      return new Promise(function (resolve, reject) {
+      return new Promise((resolve, reject) => {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("profiles")
-            .findOne(
-              { _id: mongodb.ObjectID(personId) },
-              function (error, docs) {
-                if (error) {
-                  reject({
-                    status: 500,
-                    body: error.toString(),
-                    headers: { "Content-Type": "application/json" },
-                  });
-                }
-                if (!docs) {
-                  reject({
-                    status: 401,
-                    body: "AU-011",
-                    headers: { "Content-Type": "application/json" },
-                  });
-                }
-                resolve(docs);
+            .findOne({ _id: mongodb.ObjectID(personId) }, (error, docs) => {
+              if (error) {
+                reject({
+                  status: 500,
+                  body: error.toString(),
+                  headers: { "Content-Type": "application/json" },
+                });
               }
-            );
+              if (!docs) {
+                reject({
+                  status: 401,
+                  body: { code: "AU-011" },
+                  headers: { "Content-Type": "application/json" },
+                });
+              }
+              resolve(docs);
+            });
         } catch (error) {
           reject({
             status: 500,
@@ -170,12 +167,12 @@ module.exports = function (context, req) {
 
     async function updateUser(options, query) {
       await createMongoClient();
-      return new Promise(function (resolve, reject) {
+      return new Promise((resolve, reject) => {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .updateOne(query, { $set: options }, function (error, docs) {
+            .updateOne(query, { $set: options }, (error, docs) => {
               if (error) {
                 reject({
                   status: 500,
@@ -213,24 +210,22 @@ module.exports = function (context, req) {
   }
 
   //? Global functions
-  function createMongoClient() {
-    return new Promise(function (resolve, reject) {
-      if (!mongo_client) {
-        mongodb.MongoClient.connect(
-          connection_mongoDB,
-          {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-          },
-          function (error, _mongo_client) {
-            if (error) reject(error);
-            mongo_client = _mongo_client;
-            resolve();
-          }
-        );
-      }
+  async function createMongoClient() {
+    return new Promise((resolve, reject) => {
       //* already mongo_client exists
-      resolve();
+      if (mongo_client) resolve();
+      mongodb.MongoClient.connect(
+        connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+        (error, _mongo_client) => {
+          if (error) reject(error);
+          mongo_client = _mongo_client;
+          resolve();
+        }
+      );
     });
   }
 };

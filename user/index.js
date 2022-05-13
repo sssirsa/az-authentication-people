@@ -11,8 +11,8 @@ const AZURE_STORAGE_CONNECTION_STRING =
   process.env["AUTH_AZURE_STORAGE_CONNECTION_STRING"];
 const STORAGE_ACCOUNT_NAME = process.env["AZURE_STORAGE_ACCOUNT_NAME"];
 
-const ONE_MINUTE = 60 * 1000;
 let mongo_client = null;
+const ONE_MINUTE = 60 * 1000;
 
 module.exports = function (context, req) {
   switch (req.method) {
@@ -33,7 +33,7 @@ module.exports = function (context, req) {
   function notAllowed() {
     context.res = {
       status: 405,
-      body: "Method not allowed",
+      body: { code: "AU-017" },
       headers: { "Content-Type": "application/json" },
     };
     context.done();
@@ -97,7 +97,7 @@ module.exports = function (context, req) {
               if (docs.length === 0) {
                 reject({
                   status: 404,
-                  body: "AU-001",
+                  body: { code: "AU-001" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -136,7 +136,7 @@ module.exports = function (context, req) {
               if (docs.length === 0) {
                 reject({
                   status: 404,
-                  body: "AU-002",
+                  body: { code: "AU-002" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -255,7 +255,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: "AU-003",
+                    body: { code: "AU-003" },
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -277,7 +277,7 @@ module.exports = function (context, req) {
       if (!personName || !personMiddleName) {
         return {
           status: 400,
-          body: "AU-004",
+          body: { code: "AU-004" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -285,7 +285,7 @@ module.exports = function (context, req) {
       if (!userData) {
         return {
           status: 400,
-          body: "AU-005",
+          body: { code: "AU-005" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -294,7 +294,7 @@ module.exports = function (context, req) {
       if (!username || !email || !password) {
         return {
           status: 400,
-          body: "AU-006",
+          body: { code: "AU-006" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -302,7 +302,7 @@ module.exports = function (context, req) {
       if (!validator.isEmail(userData.email)) {
         return {
           status: 400,
-          body: "AU-007",
+          body: { code: "AU-007" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -310,7 +310,7 @@ module.exports = function (context, req) {
       if (userData.password.length < 6) {
         return {
           status: 400,
-          body: "AU-008",
+          body: { code: "AU-008" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -320,7 +320,7 @@ module.exports = function (context, req) {
       if (user) {
         return {
           status: 400,
-          body: "AU-009",
+          body: { code: "AU-009" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -330,7 +330,7 @@ module.exports = function (context, req) {
       if (userbyName) {
         return {
           status: 400,
-          body: "AU-010",
+          body: { code: "AU-010" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -481,7 +481,7 @@ module.exports = function (context, req) {
       if (!id) {
         throw (context.res = {
           status: 404,
-          body: "AU-001",
+          body: { code: "AU-001" },
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -529,7 +529,7 @@ module.exports = function (context, req) {
       if (email && !validator.isEmail(email)) {
         return {
           status: 400,
-          body: "AU-006",
+          body: { code: "AU-006" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -537,7 +537,7 @@ module.exports = function (context, req) {
       if (password && password.length < 6) {
         return {
           status: 400,
-          body: "AU-009",
+          body: { code: "AU-009" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -548,7 +548,7 @@ module.exports = function (context, req) {
         if (user) {
           return {
             status: 400,
-            body: "AU-009",
+            body: { code: "AU-009" },
             headers: { "Content-Type": "application/json" },
           };
         }
@@ -560,7 +560,7 @@ module.exports = function (context, req) {
         if (user) {
           return {
             status: 400,
-            body: "AU-010",
+            body: { code: "AU-010" },
             headers: { "Content-Type": "application/json" },
           };
         }
@@ -628,24 +628,22 @@ module.exports = function (context, req) {
   }
 
   //? Global functions
-  function createMongoClient() {
-    return new Promise(function (resolve, reject) {
-      if (!mongo_client) {
-        mongodb.MongoClient.connect(
-          connection_mongoDB,
-          {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-          },
-          function (error, _mongo_client) {
-            if (error) reject(error);
-            mongo_client = _mongo_client;
-            resolve();
-          }
-        );
-      }
+  async function createMongoClient() {
+    return new Promise((resolve, reject) => {
       //* already mongo_client exists
-      resolve();
+      if (mongo_client) resolve();
+      mongodb.MongoClient.connect(
+        connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+        (error, _mongo_client) => {
+          if (error) reject(error);
+          mongo_client = _mongo_client;
+          resolve();
+        }
+      );
     });
   }
 };

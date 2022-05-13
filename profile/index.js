@@ -31,17 +31,16 @@ module.exports = function (context, req) {
   function notAllowed() {
     context.res = {
       status: 405,
-      body: "Method not allowed",
+      body: { code: "AU-017" },
       headers: { "Content-Type": "application/json" },
     };
     context.done();
   }
 
   async function GET_profile() {
-    let requestedID;
-    if (req.query) requestedID = req.query["id"];
+    const { id: requestedID } = req.query;
     try {
-      //? get all
+      //? Get All
       if (!requestedID) {
         let people = await getPeople();
         context.res = {
@@ -51,7 +50,7 @@ module.exports = function (context, req) {
         };
         context.done();
       }
-      //? get one
+      //? Get One
       let person = await getPerson(requestedID);
       context.res = {
         status: 200,
@@ -87,7 +86,7 @@ module.exports = function (context, req) {
               if (docs.length === 0) {
                 reject({
                   status: 404,
-                  body: "AU-011",
+                  body: { code: "AU-011" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -128,7 +127,7 @@ module.exports = function (context, req) {
               if (docs.length === 0) {
                 reject({
                   status: 404,
-                  body: "AU-012",
+                  body: { code: "AU-012" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -146,7 +145,6 @@ module.exports = function (context, req) {
   }
 
   async function POST_profile() {
-    let person;
     //? get variables from body
     const {
       sucursal: personSubsidiaries,
@@ -159,26 +157,27 @@ module.exports = function (context, req) {
 
     try {
       const error = await validate();
+      const subsidiaries = [];
+      let personAvatarUrl;
+
       //! validation error
       if (error) {
         context.res = error;
         context.done();
       }
 
-      let subsidiaries = [];
-      let personAvatarUrl;
       //? get subsidiaries if user has
       if (personSubsidiaries) {
-        for (let id of personSubsidiaries) {
-          if (id.length === 24) {
-            const subs = await searchSubsidiary(id);
+        for (let subsidiaryID of personSubsidiaries) {
+          if (subsidiaryID.length === 24) {
+            const subs = await searchSubsidiary(subsidiaryID);
             subsidiaries.push(subs);
           }
         }
       }
       if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
 
-      person = {
+      const person = {
         nombre: personName,
         apellido_paterno: personMiddleName,
         apellido_materno: personLastName,
@@ -186,7 +185,6 @@ module.exports = function (context, req) {
         foto: personAvatarUrl,
         permissions: userPermissions,
       };
-
       let response = await writePerson(person);
 
       context.res = {
@@ -224,7 +222,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: "003",
+                    body: { code: "AU-003" },
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -245,7 +243,7 @@ module.exports = function (context, req) {
       if (!personName || !personMiddleName) {
         return {
           status: 400,
-          body: "AU-004",
+          body: { code: "AU-004" },
           headers: { "Content-Type": "application/json" },
         };
       }
@@ -324,7 +322,7 @@ module.exports = function (context, req) {
 
   async function PUT_profile() {
     let person = {};
-
+    const { id: personID } = req.query;
     const {
       sucursal: personSubsidiaries,
       nombre: personName,
@@ -333,41 +331,38 @@ module.exports = function (context, req) {
       foto: personAvatar,
       permissions: userPermissions,
     } = req.body;
-    const { id } = req.query;
 
     try {
       //! not id for search
-      if (!id) {
+      if (!personID) {
         context.res = {
           status: 500,
-          body: "AU-011",
+          body: { code: "AU-011" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
 
-      let subsidiaries = [];
+      const subsidiaries = [];
       let personAvatarUrl;
-      let query = { _id: mongodb.ObjectID(req.query["id"]) };
+      const query = { _id: mongodb.ObjectID(personID) };
 
       if (personSubsidiaries) {
-        for (let id of personSubsidiaries) {
-          if (id.length === 24) {
-            const subs = await searchSubsidiary(id);
+        for (let subsidiaryID of personSubsidiaries) {
+          if (subsidiaryID.length === 24) {
+            const subs = await searchSubsidiary(subsidiaryID);
             subsidiaries.push(subs);
           }
         }
       }
 
       if (personAvatar) personAvatarUrl = await writeBlob(personAvatar);
-
       if (personName) person["nombre"] = personName;
       if (personMiddleName) person["apellido_paterno"] = personMiddleName;
       if (personLastName) person["apellido_materno"] = personLastName;
       if (userPermissions) person["permissions"] = userPermissions;
       if (subsidiaries.length > 0) person["sucursal"] = subsidiaries;
       if (personAvatarUrl) person["foto"] = personAvatarUrl;
-
       let response = await writePerson(person, query);
 
       if (!response.ops) {
@@ -392,7 +387,7 @@ module.exports = function (context, req) {
       context.done();
     }
 
-    // internal functions
+    //? Internal functions
     async function searchSubsidiary(subsidiaryId) {
       await createMongoClient();
       return new Promise(function (resolve, reject) {
@@ -413,7 +408,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 400,
-                    body: { message: "AU-003" },
+                    body: { code: "AU-003" },
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -501,24 +496,22 @@ module.exports = function (context, req) {
   }
 
   //? Global functions
-  function createMongoClient() {
-    return new Promise(function (resolve, reject) {
-      if (!mongo_client) {
-        mongodb.MongoClient.connect(
-          connection_mongoDB,
-          {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-          },
-          function (error, _mongo_client) {
-            if (error) reject(error);
-            mongo_client = _mongo_client;
-            resolve();
-          }
-        );
-      }
+  async function createMongoClient() {
+    return new Promise((resolve, reject) => {
       //* already mongo_client exists
-      resolve();
+      if (mongo_client) resolve();
+      mongodb.MongoClient.connect(
+        connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+        (error, _mongo_client) => {
+          if (error) reject(error);
+          mongo_client = _mongo_client;
+          resolve();
+        }
+      );
     });
   }
 };
