@@ -23,7 +23,7 @@ module.exports = function (context, req) {
       let token;
       const authHeader = req.headers.authorization;
       //! not token sended in headers
-      if (!authHeader || !authHeader.startsWith("Baerer ")) {
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
         context.res = {
           status: 400,
           body: { code: "AU-016" },
