@@ -26,7 +26,7 @@ module.exports = function (context, req) {
       if (!authHeader || !authHeader.startsWith("Baerer ")) {
         context.res = {
           status: 400,
-          body: "AU-016",
+          body: { code: "AU-016" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
@@ -74,7 +74,7 @@ module.exports = function (context, req) {
               if (!docs) {
                 reject({
                   status: 401,
-                  body: "AU-001",
+                  body: { code: "AU-001" },
                   headers: { "Content-Type": "application/json" },
                 });
               }
@@ -110,7 +110,7 @@ module.exports = function (context, req) {
                 if (!docs) {
                   reject({
                     status: 401,
-                    body: "AU-011",
+                    body: { code: "AU-011" },
                     headers: { "Content-Type": "application/json" },
                   });
                 }
@@ -174,31 +174,29 @@ module.exports = function (context, req) {
   function notAllowed() {
     context.res = {
       status: 405,
-      body: "Method not allowed",
+      body: { code: "AU-017" },
       headers: { "Content-Type": "application/json" },
     };
     context.done();
   }
 
   //? Internal globals
-  function createMongoClient() {
-    return new Promise(function (resolve, reject) {
-      if (!mongo_client) {
-        mongodb.MongoClient.connect(
-          connection_mongoDB,
-          {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-          },
-          function (error, _mongo_client) {
-            if (error) reject(error);
-            mongo_client = _mongo_client;
-            resolve();
-          }
-        );
-      }
+  async function createMongoClient() {
+    return new Promise((resolve, reject) => {
       //* already mongo_client exists
-      resolve();
+      if (mongo_client) resolve();
+      mongodb.MongoClient.connect(
+        connection_mongoDB,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+        (error, _mongo_client) => {
+          if (error) reject(error);
+          mongo_client = _mongo_client;
+          resolve();
+        }
+      );
     });
   }
 };
