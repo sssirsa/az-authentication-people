@@ -1,4 +1,3 @@
-const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mongodb = require("mongodb");
 
@@ -11,55 +10,37 @@ let mongo_client = null;
 
 module.exports = function (context, req) {
   switch (req.method) {
-    case "POST":
-      POST_login();
+    case "GET":
+      GET_refreshToken();
       break;
     default:
       notAllowed();
       break;
   }
 
-  function notAllowed() {
-    context.res = {
-      status: 405,
-      body: { code: "AU-017" },
-      headers: { "Content-Type": "application/json" },
-    };
-    context.done();
-  }
-
-  //? HTTP Requests
-  async function POST_login() {
-    let { username: userName, password: userPassword } = req.body;
-
+  async function GET_refreshToken() {
     try {
-      const error = await validate();
-      //! error in validation
-      if (error) {
-        context.res = error;
-        context.done();
-      }
-
-      const user = await searchUser();
-      //! password not match
-      if (!bcrypt.compareSync(userPassword, user.password)) {
+      let token;
+      const authHeader = req.headers.authorization;
+      //! not token sended in headers
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
         context.res = {
-          status: 401,
-          body: { code: "AU-015" },
+          status: 400,
+          body: { code: "AU-016" },
           headers: { "Content-Type": "application/json" },
         };
         context.done();
       }
-
-      const access_token = await generateJWT(user._id, userName);
+      token = authHeader.substring(7, authHeader.length);
+      const { uid, name } = jwt.verify(token, SECRET_JWT_SEED);
+      const access_token = await generateJWT(uid, name);
+      let user = await searchUser(name);
       const person = await searchPerson(user["person_id"].toString());
       const last_access = new Date();
       const userUpdate = { last_access };
-      const query = { _id: mongodb.ObjectID(user._id) };
+      let query = { _id: mongodb.ObjectID(uid) };
       await updateUser(userUpdate, query);
-
-      //* success response
-      const response = { access_token, person };
+      let response = { access_token, person };
       context.res = {
         status: 200,
         body: response,
@@ -67,10 +48,6 @@ module.exports = function (context, req) {
       };
       context.done();
     } catch (error) {
-      if (error.body) {
-        context.res = error;
-        context.done();
-      }
       context.res = {
         status: 500,
         body: error.toString(),
@@ -79,32 +56,14 @@ module.exports = function (context, req) {
       context.done();
     }
 
-    //? Internal functions
-    function validate() {
-      if (!userName) {
-        return {
-          status: 400,
-          body: { code: "AU-013" },
-          headers: { "Content-Type": "application/json" },
-        };
-      }
-      if (!userPassword) {
-        return {
-          status: 400,
-          body: { code: "AU-014" },
-          headers: { "Content-Type": "application/json" },
-        };
-      }
-    }
-
-    async function searchUser() {
+    async function searchUser(name) {
       await createMongoClient();
-      return new Promise((resolve, reject) => {
+      return new Promise(function (resolve, reject) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .findOne({ username: userName }, (error, docs) => {
+            .findOne({ username: name }, function (error, docs) {
               if (error) {
                 reject({
                   status: 500,
@@ -133,28 +92,31 @@ module.exports = function (context, req) {
 
     async function searchPerson(personId) {
       await createMongoClient();
-      return new Promise((resolve, reject) => {
+      return new Promise(function (resolve, reject) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("profiles")
-            .findOne({ _id: mongodb.ObjectID(personId) }, (error, docs) => {
-              if (error) {
-                reject({
-                  status: 500,
-                  body: error.toString(),
-                  headers: { "Content-Type": "application/json" },
-                });
+            .findOne(
+              { _id: mongodb.ObjectID(personId) },
+              function (error, docs) {
+                if (error) {
+                  reject({
+                    status: 500,
+                    body: error.toString(),
+                    headers: { "Content-Type": "application/json" },
+                  });
+                }
+                if (!docs) {
+                  reject({
+                    status: 401,
+                    body: { code: "AU-011" },
+                    headers: { "Content-Type": "application/json" },
+                  });
+                }
+                resolve(docs);
               }
-              if (!docs) {
-                reject({
-                  status: 401,
-                  body: { code: "AU-011" },
-                  headers: { "Content-Type": "application/json" },
-                });
-              }
-              resolve(docs);
-            });
+            );
         } catch (error) {
           reject({
             status: 500,
@@ -167,12 +129,12 @@ module.exports = function (context, req) {
 
     async function updateUser(options, query) {
       await createMongoClient();
-      return new Promise((resolve, reject) => {
+      return new Promise(function (resolve, reject) {
         try {
           mongo_client
             .db(MONGO_DB_NAME)
             .collection("users")
-            .updateOne(query, { $set: options }, (error, docs) => {
+            .updateOne(query, { $set: options }, function (error, docs) {
               if (error) {
                 reject({
                   status: 500,
@@ -209,7 +171,16 @@ module.exports = function (context, req) {
     }
   }
 
-  //? Global functions
+  function notAllowed() {
+    context.res = {
+      status: 405,
+      body: { code: "AU-017" },
+      headers: { "Content-Type": "application/json" },
+    };
+    context.done();
+  }
+
+  //? Internal globals
   async function createMongoClient() {
     return new Promise((resolve, reject) => {
       //* already mongo_client exists

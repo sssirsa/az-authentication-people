@@ -2,10 +2,11 @@
   "bindings": [
     {
       "authLevel": "anonymous",
+      "route": "profile/{id:length(24,24)?}",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post"]
+      "methods": ["get", "post", "put"]
     },
     {
       "type": "http",
